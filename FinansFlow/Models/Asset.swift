@@ -1,0 +1,56 @@
+import Foundation
+
+enum AssetType: String, Codable, Sendable, CaseIterable {
+    case bankAccount = "bank_account"
+    case cash
+    case investment
+    case realEstate = "real_estate"
+    case vehicle
+    case receivable
+    case other
+
+    var displayName: String {
+        switch self {
+        case .bankAccount: return "Banka Hesabı"
+        case .cash: return "Nakit"
+        case .investment: return "Yatırım"
+        case .realEstate: return "Gayrimenkul"
+        case .vehicle: return "Araç"
+        case .receivable: return "Alacak"
+        case .other: return "Diğer"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .bankAccount: return "building.columns.fill"
+        case .cash: return "banknote.fill"
+        case .investment: return "chart.line.uptrend.xyaxis"
+        case .realEstate: return "house.fill"
+        case .vehicle: return "car.fill"
+        case .receivable: return "person.fill.checkmark"
+        case .other: return "ellipsis.circle.fill"
+        }
+    }
+}
+
+struct Asset: Codable, Identifiable, Sendable {
+    let id: UUID
+    let workspaceId: UUID
+    let userId: UUID
+    var name: String
+    var type: AssetType
+    var value: Double
+    var currency: String
+    var notes: String?
+    let createdAt: Date?
+    var updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, type, value, currency, notes
+        case workspaceId = "workspace_id"
+        case userId = "user_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
