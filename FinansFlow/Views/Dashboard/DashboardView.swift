@@ -350,11 +350,13 @@ struct DashboardView: View {
     private var floatingActionButton: some View {
         Menu {
             Button {
+                HapticManager.impact(.medium)
                 showAddIncome = true
             } label: {
                 Label("Gelir Ekle", systemImage: "plus.circle.fill")
             }
             Button {
+                HapticManager.impact(.medium)
                 showAddExpense = true
             } label: {
                 Label("Gider Ekle", systemImage: "minus.circle.fill")
@@ -368,6 +370,7 @@ struct DashboardView: View {
                 .clipShape(Circle())
                 .shadow(color: .accentColor.opacity(0.3), radius: 8, y: 4)
         }
+        .accessibilityLabel("Yeni işlem ekle")
         .padding(.trailing, 20)
         .padding(.bottom, 20)
     }
@@ -400,6 +403,8 @@ struct DashboardSummaryCard: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(amount.formatted())")
     }
 }
 

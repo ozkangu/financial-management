@@ -132,28 +132,47 @@ struct InvestmentListView: View {
     }
 
     private var investmentList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(viewModel.investments) { inv in
-                InvestmentRowView(investment: inv)
-                    .contentShape(Rectangle())
-                    .onTapGesture { editingInvestment = inv }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            Task { try? await viewModel.deleteInvestment(inv) }
-                        } label: {
-                            Label("Sil", systemImage: "trash")
+        Group {
+            if viewModel.investments.isEmpty {
+                EmptyStateView(
+                    icon: "chart.pie.fill",
+                    title: "Henüz Yatırım Yok",
+                    description: "Portföyünüze ilk yatırımınızı ekleyin",
+                    actionTitle: "Yatırım Ekle"
+                ) {
+                    showAddSheet = true
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(viewModel.investments) { inv in
+                        InvestmentRowView(investment: inv)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                HapticManager.selection()
+                                editingInvestment = inv
+                            }
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task {
+                                        try? await viewModel.deleteInvestment(inv)
+                                        HapticManager.notification(.success)
+                                    }
+                                } label: {
+                                    Label("Sil", systemImage: "trash")
+                                }
+                            }
+                        if inv.id != viewModel.investments.last?.id {
+                            Divider().padding(.leading, 52)
                         }
                     }
-                if inv.id != viewModel.investments.last?.id {
-                    Divider().padding(.leading, 52)
                 }
+                .padding()
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                .padding(.horizontal)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
-        .padding(.horizontal)
     }
 }
 
@@ -190,6 +209,8 @@ struct InvestmentRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(investment.name), \(investment.type.displayName), değer: \(investment.currentValue.formatted())")
     }
 }
 

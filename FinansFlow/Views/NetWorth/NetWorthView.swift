@@ -42,11 +42,13 @@ struct NetWorthView: View {
 
                     // Snapshot Button
                     Button {
+                        HapticManager.impact(.medium)
                         Task {
                             try? await netWorthVM.createSnapshot(
                                 workspaceId: workspaceId,
                                 totalLiabilities: liabilityVM.totalDebt
                             )
+                            HapticManager.notification(.success)
                         }
                     } label: {
                         Label("Snapshot Kaydet", systemImage: "camera.fill")
@@ -54,6 +56,7 @@ struct NetWorthView: View {
                     }
                     .buttonStyle(.bordered)
                     .padding(.horizontal)
+                    .accessibilityLabel("Net varlık snapshot'ı kaydet")
                 }
                 .padding(.vertical)
             }
@@ -198,6 +201,17 @@ struct NetWorthView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
+            if netWorthVM.assets.isEmpty {
+                EmptyStateView(
+                    icon: "building.columns.fill",
+                    title: "Henüz Varlık Yok",
+                    description: "Gayrimenkul, araç veya diğer varlıklarınızı ekleyin",
+                    actionTitle: "Varlık Ekle"
+                ) {
+                    showAddAsset = true
+                }
+            }
+
             ForEach(netWorthVM.assets) { asset in
                 HStack(spacing: 12) {
                     Image(systemName: asset.type.icon)
@@ -217,7 +231,12 @@ struct NetWorthView: View {
                         .font(.subheadline.bold())
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { editingAsset = asset }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(asset.name), \(asset.type.displayName), \(asset.value.formatted())")
+                .onTapGesture {
+                    HapticManager.selection()
+                    editingAsset = asset
+                }
                 .contextMenu {
                     Button(role: .destructive) {
                         Task { try? await netWorthVM.deleteAsset(asset) }

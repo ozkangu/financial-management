@@ -37,48 +37,66 @@ struct TransactionListView: View {
                 .padding(.horizontal)
 
                 // Transaction list
-                List {
-                    let filtered = transactionVM.filteredTransactions(
-                        type: selectedType,
-                        searchText: searchText
-                    )
-                    let grouped = Dictionary(grouping: filtered) { $0.date.displayString }
-                    let sortedDates = grouped.keys.sorted { key1, key2 in
-                        let txs1 = grouped[key1]!
-                        let txs2 = grouped[key2]!
-                        return (txs1.first?.date ?? Date()) > (txs2.first?.date ?? Date())
+                let filtered = transactionVM.filteredTransactions(
+                    type: selectedType,
+                    searchText: searchText
+                )
+
+                if filtered.isEmpty && !transactionVM.isLoading {
+                    EmptyStateView(
+                        icon: "tray.fill",
+                        title: "Henüz İşlem Yok",
+                        description: "İlk gelir veya gider kaydınızı oluşturun",
+                        actionTitle: "İşlem Ekle"
+                    ) {
+                        showAddExpense = true
                     }
+                } else {
+                    List {
+                        let grouped = Dictionary(grouping: filtered) { $0.date.displayString }
+                        let sortedDates = grouped.keys.sorted { key1, key2 in
+                            let txs1 = grouped[key1]!
+                            let txs2 = grouped[key2]!
+                            return (txs1.first?.date ?? Date()) > (txs2.first?.date ?? Date())
+                        }
 
-                    ForEach(sortedDates, id: \.self) { dateStr in
-                        Section(dateStr) {
-                            ForEach(grouped[dateStr] ?? []) { tx in
-                                TransactionRowView(
-                                    transaction: tx,
-                                    category: categoryVM.categories.first { $0.id == tx.categoryId }
-                                )
-                                .onTapGesture { editingTransaction = tx }
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        Task { try? await transactionVM.deleteTransaction(tx) }
-                                    } label: {
-                                        Label("Sil", systemImage: "trash")
-                                    }
-
-                                    Button {
+                        ForEach(sortedDates, id: \.self) { dateStr in
+                            Section(dateStr) {
+                                ForEach(grouped[dateStr] ?? []) { tx in
+                                    TransactionRowView(
+                                        transaction: tx,
+                                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                                    )
+                                    .onTapGesture {
+                                        HapticManager.selection()
                                         editingTransaction = tx
-                                    } label: {
-                                        Label("Düzenle", systemImage: "pencil")
                                     }
-                                    .tint(.blue)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            Task {
+                                                try? await transactionVM.deleteTransaction(tx)
+                                                HapticManager.notification(.success)
+                                            }
+                                        } label: {
+                                            Label("Sil", systemImage: "trash")
+                                        }
+
+                                        Button {
+                                            editingTransaction = tx
+                                        } label: {
+                                            Label("Düzenle", systemImage: "pencil")
+                                        }
+                                        .tint(.blue)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                .listStyle(.insetGrouped)
-                .searchable(text: $searchText, prompt: "İşlem ara...")
-                .refreshable {
-                    await transactionVM.loadTransactions(workspaceId: workspaceId, reset: true)
+                    .listStyle(.insetGrouped)
+                    .searchable(text: $searchText, prompt: "İşlem ara...")
+                    .refreshable {
+                        await transactionVM.loadTransactions(workspaceId: workspaceId, reset: true)
+                    }
                 }
             }
             .navigationTitle("İşlemler")
@@ -214,6 +232,8 @@ struct TransactionRowView: View {
             }
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(category?.name ?? "Kategori Yok"), \(transaction.type == .income ? "gelir" : "gider"), \(transaction.amount.formatted())")
     }
 }
 

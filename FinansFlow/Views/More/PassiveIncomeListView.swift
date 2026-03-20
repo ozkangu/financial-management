@@ -35,18 +35,38 @@ struct PassiveIncomeListView: View {
                 .padding(.vertical, 4)
             }
 
-            Section("Pasif Gelirler") {
-                ForEach(viewModel.passiveIncomes) { income in
-                    PassiveIncomeRowView(
-                        income: income,
-                        investmentName: investmentVM.investments.first { $0.id == income.investmentId }?.name
-                    )
-                    .onTapGesture { editingIncome = income }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            Task { try? await viewModel.deletePassiveIncome(income) }
-                        } label: {
-                            Label("Sil", systemImage: "trash")
+            if viewModel.passiveIncomes.isEmpty {
+                Section {
+                    EmptyStateView(
+                        icon: "leaf.fill",
+                        title: "Henüz Pasif Gelir Yok",
+                        description: "Temettü, kira veya faiz gibi pasif gelirlerinizi ekleyin",
+                        actionTitle: "Pasif Gelir Ekle"
+                    ) {
+                        showAddSheet = true
+                    }
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                Section("Pasif Gelirler") {
+                    ForEach(viewModel.passiveIncomes) { income in
+                        PassiveIncomeRowView(
+                            income: income,
+                            investmentName: investmentVM.investments.first { $0.id == income.investmentId }?.name
+                        )
+                        .onTapGesture {
+                            HapticManager.selection()
+                            editingIncome = income
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task {
+                                    try? await viewModel.deletePassiveIncome(income)
+                                    HapticManager.notification(.success)
+                                }
+                            } label: {
+                                Label("Sil", systemImage: "trash")
+                            }
                         }
                     }
                 }
@@ -120,5 +140,7 @@ struct PassiveIncomeRowView: View {
             }
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(income.description ?? income.type.displayName), \(income.amount.formatted()), \(income.frequency.displayName)")
     }
 }

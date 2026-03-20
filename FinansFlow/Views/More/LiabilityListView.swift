@@ -33,17 +33,37 @@ struct LiabilityListView: View {
             }
 
             // Liability list
-            Section("Borçlar") {
-                ForEach(viewModel.liabilities) { liability in
-                    LiabilityRowView(liability: liability)
-                        .onTapGesture { editingLiability = liability }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                Task { try? await viewModel.deleteLiability(liability) }
-                            } label: {
-                                Label("Sil", systemImage: "trash")
+            if viewModel.liabilities.isEmpty {
+                Section {
+                    EmptyStateView(
+                        icon: "creditcard.fill",
+                        title: "Henüz Borç Kaydı Yok",
+                        description: "Kredi, kredi kartı veya diğer borçlarınızı ekleyin",
+                        actionTitle: "Borç Ekle"
+                    ) {
+                        showAddSheet = true
+                    }
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                Section("Borçlar") {
+                    ForEach(viewModel.liabilities) { liability in
+                        LiabilityRowView(liability: liability)
+                            .onTapGesture {
+                                HapticManager.selection()
+                                editingLiability = liability
                             }
-                        }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        try? await viewModel.deleteLiability(liability)
+                                        HapticManager.notification(.success)
+                                    }
+                                } label: {
+                                    Label("Sil", systemImage: "trash")
+                                }
+                            }
+                    }
                 }
             }
         }
@@ -120,5 +140,7 @@ struct LiabilityRowView: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(liability.name), \(liability.type.displayName), kalan: \(liability.remainingAmount.formatted())")
     }
 }
