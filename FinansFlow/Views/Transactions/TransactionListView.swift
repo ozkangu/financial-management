@@ -46,17 +46,7 @@ struct TransactionListView: View {
                     activeFiltersBar
                 }
 
-                // Transaction list
-                let filtered = transactionVM.filteredTransactions(
-                    type: selectedType,
-                    categoryId: selectedCategoryId,
-                    visibilityScope: selectedVisibilityScope,
-                    searchText: searchText,
-                    startDate: useStartDate ? startDate : nil,
-                    endDate: useEndDate ? endDate : nil
-                )
-
-                if filtered.isEmpty && !transactionVM.isLoading {
+                if transactionVM.visibleTransactions.isEmpty && !transactionVM.isFeedLoading {
                     if isFilterResultEmpty {
                         EmptyStateView(
                             icon: "line.3.horizontal.decrease.circle",
@@ -80,7 +70,7 @@ struct TransactionListView: View {
                     }
                 } else {
                     List {
-                        let grouped = Dictionary(grouping: filtered) { $0.date.displayString }
+                        let grouped = Dictionary(grouping: transactionVM.visibleTransactions) { $0.date.displayString }
                         let sortedDates = grouped.keys.sorted { key1, key2 in
                             let txs1 = grouped[key1]!
                             let txs2 = grouped[key2]!
@@ -101,8 +91,12 @@ struct TransactionListView: View {
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
                                             Task {
-                                                try? await transactionVM.deleteTransaction(tx)
-                                                HapticManager.notification(.success)
+                                                do {
+                                                    try await transactionVM.deleteTransaction(tx)
+                                                    HapticManager.notification(.success)
+                                                } catch {
+                                                    transactionVM.feedErrorMessage = error.localizedDescription
+                                                }
                                             }
                                         } label: {
                                             Label("Sil", systemImage: "trash")
@@ -118,11 +112,33 @@ struct TransactionListView: View {
                                 }
                             }
                         }
+
+                        if transactionVM.hasMoreFeedPages {
+                            Section {
+                                Button {
+                                    Task {
+                                        await transactionVM.loadTransactionFeed(
+                                            query: currentQuery,
+                                            reset: false
+                                        )
+                                    }
+                                } label: {
+                                    if transactionVM.isFeedLoading {
+                                        ProgressView()
+                                            .frame(maxWidth: .infinity)
+                                    } else {
+                                        Text("Daha Fazla Yükle")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                }
+                                .disabled(transactionVM.isFeedLoading)
+                            }
+                        }
                     }
                     .listStyle(.insetGrouped)
                     .searchable(text: $searchText, prompt: "İşlem ara...")
                     .refreshable {
-                        await transactionVM.loadTransactions(workspaceId: workspaceId, reset: true)
+                        await transactionVM.loadTransactionFeed(query: currentQuery, reset: true)
                     }
                 }
             }
@@ -198,11 +214,26 @@ struct TransactionListView: View {
             .onChange(of: categoryVM.categories.map(\.id)) { _, _ in
                 normalizeCategoryFilter(selectedType: selectedType, resetIfMissing: true)
             }
+            .task(id: currentQuery.cacheKey) {
+                await transactionVM.loadTransactionFeed(query: currentQuery, reset: true)
+            }
+            .alert("Islem Basarisiz", isPresented: Binding(
+                get: { transactionVM.feedErrorMessage != nil },
+                set: { if !$0 { transactionVM.feedErrorMessage = nil } }
+            )) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(transactionVM.feedErrorMessage ?? "Bilinmeyen hata")
+            }
         }
     }
 
     private var hasActiveFilters: Bool {
-        selectedCategoryId != nil || selectedVisibilityScope != nil || useStartDate || useEndDate
+        selectedCategoryId != nil ||
+        selectedVisibilityScope != nil ||
+        useStartDate ||
+        useEndDate ||
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var isFilterResultEmpty: Bool {
@@ -210,6 +241,18 @@ struct TransactionListView: View {
             hasTransactions: !transactionVM.transactions.isEmpty,
             hasActiveFilters: hasActiveFilters,
             searchText: searchText
+        )
+    }
+
+    private var currentQuery: TransactionFeedQuery {
+        TransactionFeedQuery(
+            workspaceId: workspaceId,
+            type: selectedType,
+            categoryId: selectedCategoryId,
+            visibilityScope: selectedVisibilityScope,
+            searchText: searchText,
+            startDate: useStartDate ? startDate : nil,
+            endDate: useEndDate ? endDate : nil
         )
     }
 

@@ -817,6 +817,175 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertEqual(viewModel.workspaceName(for: invitation), "Ortak Butce")
     }
 
+    func testTransactionFeedQueryTrimsWhitespaceOnlySearchText() {
+        let query = TransactionFeedQuery(
+            workspaceId: UUID(),
+            searchText: "   "
+        )
+
+        XCTAssertEqual(query.searchText, "")
+    }
+
+    func testTransactionViewModelMergesPagedTransactionsWithoutDuplicates() {
+        let workspaceId = UUID()
+        let existing = Transaction(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: UUID(),
+            type: .expense,
+            categoryId: nil,
+            amount: 100,
+            currency: "TRY",
+            date: Date(),
+            description: "Ilk",
+            paymentMethod: nil,
+            visibilityScope: .personal,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        let newTransaction = Transaction(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: UUID(),
+            type: .income,
+            categoryId: nil,
+            amount: 250,
+            currency: "TRY",
+            date: Date().addingTimeInterval(-60),
+            description: "Ikinci",
+            paymentMethod: nil,
+            visibilityScope: .shared,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        let viewModel = TransactionViewModel()
+
+        let merged = viewModel.mergeUniqueTransactions(
+            existing: [existing],
+            incoming: [existing, newTransaction]
+        )
+
+        XCTAssertEqual(merged.map(\.id), [existing.id, newTransaction.id])
+    }
+
+    func testTransactionViewModelMatchesFeedQueryAndRejectsDifferentFilters() {
+        let workspaceId = UUID()
+        let categoryId = UUID()
+        let matchingTransaction = Transaction(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: UUID(),
+            type: .expense,
+            categoryId: categoryId,
+            amount: 320,
+            currency: "TRY",
+            date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!,
+            description: "Haftalik market alisverisi",
+            paymentMethod: nil,
+            visibilityScope: .shared,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        let nonMatchingTransaction = Transaction(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: UUID(),
+            type: .income,
+            categoryId: nil,
+            amount: 500,
+            currency: "TRY",
+            date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!,
+            description: "Maas",
+            paymentMethod: nil,
+            visibilityScope: .personal,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        let query = TransactionFeedQuery(
+            workspaceId: workspaceId,
+            type: .expense,
+            categoryId: categoryId,
+            visibilityScope: .shared,
+            searchText: "market",
+            startDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 31))!
+        )
+        let viewModel = TransactionViewModel()
+
+        XCTAssertTrue(viewModel.matches(transaction: matchingTransaction, query: query))
+        XCTAssertFalse(viewModel.matches(transaction: nonMatchingTransaction, query: query))
+    }
+
+    func testTransactionFilterSupportDoesNotShowFilteredEmptyStateWithoutAnyTransactions() {
+        XCTAssertFalse(
+            TransactionFilterSupport.isFilterResultEmpty(
+                hasTransactions: false,
+                hasActiveFilters: true,
+                searchText: "market"
+            )
+        )
+    }
+
+    func testTransactionViewModelReconcilesVisibleTransactionsWithActiveFeedQuery() {
+        let workspaceId = UUID()
+        let categoryId = UUID()
+        let matching = Transaction(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: UUID(),
+            type: .expense,
+            categoryId: categoryId,
+            amount: 300,
+            currency: "TRY",
+            date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!,
+            description: "Market",
+            paymentMethod: nil,
+            visibilityScope: .shared,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        var edited = matching
+        edited.type = .income
+
+        let viewModel = TransactionViewModel()
+        let query = TransactionFeedQuery(
+            workspaceId: workspaceId,
+            type: .expense,
+            categoryId: categoryId,
+            visibilityScope: .shared,
+            searchText: "market"
+        )
+
+        let inserted = viewModel.reconciledVisibleTransactions(
+            current: [],
+            with: matching,
+            query: query
+        )
+        XCTAssertEqual(inserted.map(\.id), [matching.id])
+
+        let removed = viewModel.reconciledVisibleTransactions(
+            current: inserted,
+            with: edited,
+            query: query
+        )
+        XCTAssertTrue(removed.isEmpty)
+    }
+
     func testWorkspaceCollaborationErrorsExposeUserFriendlyMessages() {
         XCTAssertEqual(
             WorkspaceCollaborationError.invalidEmail.errorDescription,

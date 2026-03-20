@@ -46,6 +46,49 @@ actor SupabaseService {
         }
     }
 
+    func fetchTransactionsPage(
+        query: TransactionFeedQuery,
+        offset: Int,
+        limit: Int
+    ) async throws -> [Transaction] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        var request = client.from("transactions")
+            .select()
+            .eq("workspace_id", value: query.workspaceId.uuidString)
+
+        if let type = query.type {
+            request = request.eq("type", value: type.rawValue)
+        }
+
+        if let categoryId = query.categoryId {
+            request = request.eq("category_id", value: categoryId.uuidString)
+        }
+
+        if let visibilityScope = query.visibilityScope {
+            request = request.eq("visibility_scope", value: visibilityScope.rawValue)
+        }
+
+        if let startDate = query.startDate {
+            request = request.gte("date", value: dateFormatter.string(from: startDate))
+        }
+
+        if let endDate = query.endDate {
+            request = request.lte("date", value: dateFormatter.string(from: endDate))
+        }
+
+        if !query.searchText.isEmpty {
+            request = request.ilike("description", pattern: "%\(query.searchText)%")
+        }
+
+        return try await request
+            .order("date", ascending: false)
+            .range(from: offset, to: offset + limit - 1)
+            .execute()
+            .value
+    }
+
     func fetchOne<T: Decodable & Sendable>(
         from table: String,
         id: UUID
