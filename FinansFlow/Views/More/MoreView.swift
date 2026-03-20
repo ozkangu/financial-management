@@ -32,7 +32,11 @@ struct MoreView: View {
             List {
                 Section("Finans") {
                     NavigationLink {
-                        CategoryListView(viewModel: categoryVM, workspaceId: wsId)
+                        CategoryListView(
+                            viewModel: categoryVM,
+                            transactionVM: transactionVM,
+                            workspaceId: wsId
+                        )
                     } label: {
                         Label("Kategoriler", systemImage: "folder.fill")
                     }

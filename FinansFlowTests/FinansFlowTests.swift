@@ -198,6 +198,223 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertFalse(summary.hasAnyData)
     }
 
+    func testDashboardCategoryBudgetSummariesHighlightExceededAndWarningBudgets() {
+        let workspaceId = UUID()
+        let foodId = UUID()
+        let transportId = UUID()
+        let categories = [
+            Category(
+                id: foodId,
+                workspaceId: workspaceId,
+                name: "Market",
+                type: .expense,
+                parentId: nil,
+                color: "#FF0000",
+                icon: "cart",
+                monthlyBudget: 1_000,
+                isDefault: false,
+                createdAt: nil
+            ),
+            Category(
+                id: transportId,
+                workspaceId: workspaceId,
+                name: "Ulasim",
+                type: .expense,
+                parentId: nil,
+                color: "#00FF00",
+                icon: "car",
+                monthlyBudget: 500,
+                isDefault: false,
+                createdAt: nil
+            )
+        ]
+        let transactions = [
+            Transaction(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: UUID(),
+                type: .expense,
+                categoryId: foodId,
+                amount: 1_200,
+                currency: "TRY",
+                date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 12))!,
+                description: "Market",
+                paymentMethod: nil,
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            Transaction(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: UUID(),
+                type: .expense,
+                categoryId: transportId,
+                amount: 420,
+                currency: "TRY",
+                date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 10))!,
+                description: "Taksi",
+                paymentMethod: nil,
+                visibilityScope: .personal,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        let summaries = DashboardMetrics.categoryBudgetSummaries(
+            categories: categories,
+            transactions: transactions,
+            referenceDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+        )
+
+        XCTAssertEqual(summaries.map(\.name), ["Market", "Ulasim"])
+        XCTAssertEqual(summaries[0].status, .exceeded)
+        XCTAssertEqual(summaries[1].status, .warning)
+        XCTAssertEqual(
+            DashboardMetrics.topBudgetAlert(
+                categories: categories,
+                transactions: transactions,
+                referenceDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+            )?.name,
+            "Market"
+        )
+    }
+
+    func testDashboardCategoryBudgetSummariesIncludeSubcategorySpendAndTrackHealthyBudgets() {
+        let workspaceId = UUID()
+        let parentId = UUID()
+        let childId = UUID()
+        let categories = [
+            Category(
+                id: parentId,
+                workspaceId: workspaceId,
+                name: "Ev",
+                type: .expense,
+                parentId: nil,
+                color: "#111111",
+                icon: "house",
+                monthlyBudget: 2_000,
+                isDefault: false,
+                createdAt: nil
+            ),
+            Category(
+                id: childId,
+                workspaceId: workspaceId,
+                name: "Fatura",
+                type: .expense,
+                parentId: parentId,
+                color: "#222222",
+                icon: "bolt",
+                monthlyBudget: nil,
+                isDefault: false,
+                createdAt: nil
+            )
+        ]
+        let transactions = [
+            Transaction(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: UUID(),
+                type: .expense,
+                categoryId: childId,
+                amount: 600,
+                currency: "TRY",
+                date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 8))!,
+                description: "Elektrik",
+                paymentMethod: nil,
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        let summaries = DashboardMetrics.categoryBudgetSummaries(
+            categories: categories,
+            transactions: transactions,
+            referenceDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+        )
+
+        XCTAssertEqual(summaries.first?.spent, 600)
+        XCTAssertEqual(summaries.first?.status, .onTrack)
+        XCTAssertNil(
+            DashboardMetrics.topBudgetAlert(
+                categories: categories,
+                transactions: transactions,
+                referenceDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+            )
+        )
+    }
+
+    func testDashboardCategoryBudgetSummariesDoNotDoubleCountBudgetedChildren() {
+        let workspaceId = UUID()
+        let parentId = UUID()
+        let childId = UUID()
+        let categories = [
+            Category(
+                id: parentId,
+                workspaceId: workspaceId,
+                name: "Ev",
+                type: .expense,
+                parentId: nil,
+                color: "#111111",
+                icon: "house",
+                monthlyBudget: 2_000,
+                isDefault: false,
+                createdAt: nil
+            ),
+            Category(
+                id: childId,
+                workspaceId: workspaceId,
+                name: "Fatura",
+                type: .expense,
+                parentId: parentId,
+                color: "#222222",
+                icon: "bolt",
+                monthlyBudget: 800,
+                isDefault: false,
+                createdAt: nil
+            )
+        ]
+        let transactions = [
+            Transaction(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: UUID(),
+                type: .expense,
+                categoryId: childId,
+                amount: 600,
+                currency: "TRY",
+                date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 8))!,
+                description: "Elektrik",
+                paymentMethod: nil,
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        let summaries = DashboardMetrics.categoryBudgetSummaries(
+            categories: categories,
+            transactions: transactions,
+            referenceDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+        )
+
+        XCTAssertEqual(summaries.first(where: { $0.id == parentId })?.spent, 0)
+        XCTAssertEqual(summaries.first(where: { $0.id == childId })?.spent, 600)
+    }
+
     func testDashboardInsightsGenerateTopExpenseMonthlyChangeAndDebtPressure() {
         let calendar = Calendar.current
         let now = calendar.date(from: DateComponents(year: 2026, month: 3, day: 20))!

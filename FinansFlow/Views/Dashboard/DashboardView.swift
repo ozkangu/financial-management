@@ -53,6 +53,22 @@ struct DashboardView: View {
         )
     }
 
+    private var budgetSummaries: [DashboardCategoryBudgetSummary] {
+        DashboardMetrics.categoryBudgetSummaries(
+            categories: categoryVM.categories,
+            transactions: transactionVM.transactions,
+            referenceDate: now
+        )
+    }
+
+    private var topBudgetAlert: DashboardCategoryBudgetSummary? {
+        DashboardMetrics.topBudgetAlert(
+            categories: categoryVM.categories,
+            transactions: transactionVM.transactions,
+            referenceDate: now
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -75,6 +91,8 @@ struct DashboardView: View {
                         upcomingPaymentsCard
                     }
                     .padding(.horizontal)
+
+                    budgetSection
 
                     insightsSection
 
@@ -403,6 +421,53 @@ struct DashboardView: View {
 
     // MARK: - Recent Transactions
 
+    private var budgetSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("BUTCE TAKIBI")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if let topBudgetAlert {
+                Text(budgetAlertText(for: topBudgetAlert))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(topBudgetAlert.status == .exceeded ? .red : .orange)
+            } else if budgetSummaries.isEmpty {
+                Text("Butceli kategori bulunmuyor. Kategori ekranindan aylik butce ekleyin.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Tum butceler bu ay plan dahilinde ilerliyor.")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+            }
+
+            ForEach(Array(budgetSummaries.prefix(3))) { summary in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(summary.name)
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Text("\(summary.spent.formatted()) / \(summary.budget.formatted())")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(summaryColor(for: summary))
+                    }
+
+                    ProgressView(value: min(summary.utilization, 1.0))
+                        .tint(summaryColor(for: summary))
+
+                    Text(budgetStatusText(for: summary))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .padding(.horizontal)
+    }
+
     private var insightsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("ICGORULER")
@@ -429,6 +494,39 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .padding(.horizontal)
+    }
+
+    private func summaryColor(for summary: DashboardCategoryBudgetSummary) -> Color {
+        switch summary.status {
+        case .onTrack:
+            return .green
+        case .warning:
+            return .orange
+        case .exceeded:
+            return .red
+        }
+    }
+
+    private func budgetAlertText(for summary: DashboardCategoryBudgetSummary) -> String {
+        switch summary.status {
+        case .exceeded:
+            return "\(summary.name) butcesi \(abs(summary.remaining).formatted()) asildi."
+        case .warning:
+            return "\(summary.name) butcesinin \(Int(summary.utilization * 100))% seviyesine ulasildi."
+        case .onTrack:
+            return "\(summary.name) butcesi plan dahilinde ilerliyor."
+        }
+    }
+
+    private func budgetStatusText(for summary: DashboardCategoryBudgetSummary) -> String {
+        switch summary.status {
+        case .exceeded:
+            return "Butce asimi: \(abs(summary.remaining).formatted())"
+        case .warning:
+            return "Kalan butce: \(max(summary.remaining, 0).formatted())"
+        case .onTrack:
+            return "Kalan butce: \(max(summary.remaining, 0).formatted())"
+        }
     }
 
     private var recentTransactionsSection: some View {

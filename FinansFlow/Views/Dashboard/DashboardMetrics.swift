@@ -58,6 +58,38 @@ struct DashboardInsightItem: Equatable, Identifiable {
     let message: String
 }
 
+enum DashboardBudgetStatus: Equatable {
+    case onTrack
+    case warning
+    case exceeded
+}
+
+struct DashboardCategoryBudgetSummary: Equatable, Identifiable {
+    let id: UUID
+    let name: String
+    let budget: Double
+    let spent: Double
+
+    var remaining: Double {
+        budget - spent
+    }
+
+    var utilization: Double {
+        guard budget > 0 else { return 0 }
+        return spent / budget
+    }
+
+    var status: DashboardBudgetStatus {
+        if spent > budget {
+            return .exceeded
+        }
+        if utilization >= 0.8 {
+            return .warning
+        }
+        return .onTrack
+    }
+}
+
 enum DashboardMetrics {
     static func netWorthSummary(
         assets: [Asset],
@@ -127,6 +159,62 @@ enum DashboardMetrics {
             )
         ]
         .compactMap { $0 }
+    }
+
+    static func categoryBudgetSummaries(
+        categories: [Category],
+        transactions: [Transaction],
+        referenceDate: Date
+    ) -> [DashboardCategoryBudgetSummary] {
+        let expenseTransactions = transactions.filter {
+            $0.type == .expense &&
+            $0.date >= referenceDate.startOfMonth &&
+            $0.date <= referenceDate.endOfMonth
+        }
+
+        return categories
+            .filter { category in
+                category.type == .expense &&
+                (category.monthlyBudget ?? 0) > 0
+            }
+            .map { category in
+                let includedCategoryIds = descendantCategoryIds(
+                    for: category.id,
+                    in: categories
+                )
+                let spent = expenseTransactions
+                    .filter { transaction in
+                        guard let categoryId = transaction.categoryId else { return false }
+                        return includedCategoryIds.contains(categoryId)
+                    }
+                    .reduce(0) { $0 + $1.amount }
+
+                return DashboardCategoryBudgetSummary(
+                    id: category.id,
+                    name: category.name,
+                    budget: category.monthlyBudget ?? 0,
+                    spent: spent
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.status != rhs.status {
+                    return budgetStatusRank(lhs.status) < budgetStatusRank(rhs.status)
+                }
+                return lhs.utilization > rhs.utilization
+            }
+    }
+
+    static func topBudgetAlert(
+        categories: [Category],
+        transactions: [Transaction],
+        referenceDate: Date
+    ) -> DashboardCategoryBudgetSummary? {
+        categoryBudgetSummaries(
+            categories: categories,
+            transactions: transactions,
+            referenceDate: referenceDate
+        )
+        .first(where: { $0.status != .onTrack })
     }
 
     private static func topExpenseCategoryInsight(
@@ -257,5 +345,47 @@ enum DashboardMetrics {
 
         let direction = amount > 0 ? "artti" : "azaldi"
         return "\(label) \(abs(amount).formatted()) kadar \(direction)"
+    }
+
+    private static func budgetStatusRank(_ status: DashboardBudgetStatus) -> Int {
+        switch status {
+        case .exceeded:
+            return 0
+        case .warning:
+            return 1
+        case .onTrack:
+            return 2
+        }
+    }
+
+    private static func descendantCategoryIds(
+        for rootId: UUID,
+        in categories: [Category]
+    ) -> Set<UUID> {
+        let childrenByParent = Dictionary(grouping: categories) { $0.parentId }
+
+        func collectChildren(from categoryId: UUID) -> Set<UUID> {
+            var collected: Set<UUID> = []
+
+            for child in childrenByParent[categoryId] ?? [] {
+                let childHasBudget = (child.monthlyBudget ?? 0) > 0
+                if childHasBudget {
+                    continue
+                }
+
+                collected.insert(child.id)
+                collected.formUnion(collectChildren(from: child.id))
+            }
+
+            return collected
+        }
+
+        func collect(from categoryId: UUID) -> Set<UUID> {
+            var collected: Set<UUID> = [categoryId]
+            collected.formUnion(collectChildren(from: categoryId))
+            return collected
+        }
+
+        return collect(from: rootId)
     }
 }
