@@ -4,11 +4,24 @@ struct MoreView: View {
     @Environment(AuthService.self) private var authService
     @Bindable var workspaceVM: WorkspaceViewModel
     @Bindable var categoryVM: CategoryViewModel
+    @Bindable var investmentVM: InvestmentViewModel
+    @Bindable var passiveIncomeVM: PassiveIncomeViewModel
+    @Bindable var liabilityVM: LiabilityViewModel
 
     init(workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel()) {
+         categoryVM: CategoryViewModel = CategoryViewModel(),
+         investmentVM: InvestmentViewModel = InvestmentViewModel(),
+         passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
+         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
         self.workspaceVM = workspaceVM
         self.categoryVM = categoryVM
+        self.investmentVM = investmentVM
+        self.passiveIncomeVM = passiveIncomeVM
+        self.liabilityVM = liabilityVM
+    }
+
+    private var wsId: UUID {
+        workspaceVM.activeWorkspace?.id ?? UUID()
     }
 
     var body: some View {
@@ -16,22 +29,23 @@ struct MoreView: View {
             List {
                 Section("Finans") {
                     NavigationLink {
-                        CategoryListView(
-                            viewModel: categoryVM,
-                            workspaceId: workspaceVM.activeWorkspace?.id ?? UUID()
-                        )
+                        CategoryListView(viewModel: categoryVM, workspaceId: wsId)
                     } label: {
                         Label("Kategoriler", systemImage: "folder.fill")
                     }
 
                     NavigationLink {
-                        Text("Pasif Gelirler")
+                        PassiveIncomeListView(
+                            viewModel: passiveIncomeVM,
+                            investmentVM: investmentVM,
+                            workspaceId: wsId
+                        )
                     } label: {
                         Label("Pasif Gelirler", systemImage: "chart.bar.fill")
                     }
 
                     NavigationLink {
-                        Text("Borçlar")
+                        LiabilityListView(viewModel: liabilityVM, workspaceId: wsId)
                     } label: {
                         Label("Borçlar", systemImage: "creditcard.fill")
                     }
@@ -53,7 +67,7 @@ struct MoreView: View {
 
                 Section("Uygulama") {
                     NavigationLink {
-                        Text("Ayarlar")
+                        SettingsView()
                     } label: {
                         Label("Ayarlar", systemImage: "gearshape.fill")
                     }

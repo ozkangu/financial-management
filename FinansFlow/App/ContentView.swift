@@ -5,6 +5,14 @@ struct ContentView: View {
     @State private var workspaceVM = WorkspaceViewModel()
     @State private var categoryVM = CategoryViewModel()
     @State private var transactionVM = TransactionViewModel()
+    @State private var investmentVM = InvestmentViewModel()
+    @State private var passiveIncomeVM = PassiveIncomeViewModel()
+    @State private var liabilityVM = LiabilityViewModel()
+    @State private var netWorthVM = NetWorthViewModel()
+
+    private var wsId: UUID {
+        workspaceVM.activeWorkspace?.id ?? UUID()
+    }
 
     var body: some View {
         TabView {
@@ -20,25 +28,35 @@ struct ContentView: View {
             TransactionListView(
                 transactionVM: transactionVM,
                 categoryVM: categoryVM,
-                workspaceId: workspaceVM.activeWorkspace?.id ?? UUID()
+                workspaceId: wsId
             )
             .tabItem {
                 Label("İşlemler", systemImage: "arrow.left.arrow.right")
             }
 
-            InvestmentListView()
-                .tabItem {
-                    Label("Yatırımlar", systemImage: "chart.pie.fill")
-                }
+            InvestmentListView(
+                viewModel: investmentVM,
+                workspaceId: wsId
+            )
+            .tabItem {
+                Label("Yatırımlar", systemImage: "chart.pie.fill")
+            }
 
-            NetWorthView()
-                .tabItem {
-                    Label("Varlık", systemImage: "banknote.fill")
-                }
+            NetWorthView(
+                netWorthVM: netWorthVM,
+                liabilityVM: liabilityVM,
+                workspaceId: wsId
+            )
+            .tabItem {
+                Label("Varlık", systemImage: "banknote.fill")
+            }
 
             MoreView(
                 workspaceVM: workspaceVM,
-                categoryVM: categoryVM
+                categoryVM: categoryVM,
+                investmentVM: investmentVM,
+                passiveIncomeVM: passiveIncomeVM,
+                liabilityVM: liabilityVM
             )
             .tabItem {
                 Label("Daha Fazla", systemImage: "ellipsis.circle.fill")
@@ -51,6 +69,11 @@ struct ContentView: View {
             if let wsId = workspaceVM.activeWorkspace?.id {
                 await categoryVM.loadCategories(workspaceId: wsId)
                 await transactionVM.loadTransactions(workspaceId: wsId, reset: true)
+                await investmentVM.loadInvestments(workspaceId: wsId)
+                await passiveIncomeVM.loadPassiveIncomes(workspaceId: wsId)
+                await liabilityVM.loadLiabilities(workspaceId: wsId)
+                await netWorthVM.loadAssets(workspaceId: wsId)
+                await netWorthVM.loadSnapshots(workspaceId: wsId)
             }
         }
     }
