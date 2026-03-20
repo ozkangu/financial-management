@@ -12,19 +12,19 @@ struct WorkspaceListView: View {
     var body: some View {
         List {
             Section("Workspace'lerim") {
-                ForEach(viewModel.workspaces) { ws in
+                ForEach(viewModel.workspaces) { workspace in
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(ws.name)
+                            Text(workspace.name)
                                 .font(.headline)
-                            if ws.id == viewModel.activeWorkspace?.id {
+                            if workspace.id == viewModel.activeWorkspace?.id {
                                 Text("Aktif")
                                     .font(.caption)
                                     .foregroundStyle(.green)
                             }
                         }
                         Spacer()
-                        if ws.ownerId == authService.currentUser?.id {
+                        if workspace.ownerId == authService.currentUser?.id {
                             Image(systemName: "crown.fill")
                                 .foregroundStyle(.orange)
                                 .font(.caption)
@@ -32,19 +32,19 @@ struct WorkspaceListView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        viewModel.activeWorkspace = ws
+                        viewModel.activeWorkspace = workspace
                     }
                     .swipeActions(edge: .trailing) {
-                        if ws.ownerId == authService.currentUser?.id {
+                        if workspace.ownerId == authService.currentUser?.id {
                             Button(role: .destructive) {
-                                Task { try? await viewModel.deleteWorkspace(ws) }
+                                Task { try? await viewModel.deleteWorkspace(workspace) }
                             } label: {
                                 Label("Sil", systemImage: "trash")
                             }
 
                             Button {
-                                editingWorkspace = ws
-                                newWorkspaceName = ws.name
+                                editingWorkspace = workspace
+                                newWorkspaceName = workspace.name
                                 showEditSheet = true
                             } label: {
                                 Label("Düzenle", systemImage: "pencil")
@@ -79,9 +79,9 @@ struct WorkspaceListView: View {
         .alert("Workspace Düzenle", isPresented: $showEditSheet) {
             TextField("Yeni Ad", text: $newWorkspaceName)
             Button("Kaydet") {
-                guard var ws = editingWorkspace else { return }
-                ws.name = newWorkspaceName
-                Task { try? await viewModel.updateWorkspace(ws) }
+                guard var existingWorkspace = editingWorkspace else { return }
+                existingWorkspace.name = newWorkspaceName
+                Task { try? await viewModel.updateWorkspace(existingWorkspace) }
             }
             Button("İptal", role: .cancel) {}
         }

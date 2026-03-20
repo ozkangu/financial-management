@@ -9,15 +9,15 @@ final class CategoryViewModel {
     private let service = SupabaseService.shared
 
     var incomeCategories: [Category] {
-        categories.filter { $0.type == .income && $0.parentId == nil }
+        categories.filter { category in category.type == .income && category.parentId == nil }
     }
 
     var expenseCategories: [Category] {
-        categories.filter { $0.type == .expense && $0.parentId == nil }
+        categories.filter { category in category.type == .expense && category.parentId == nil }
     }
 
     func subcategories(of parentId: UUID) -> [Category] {
-        categories.filter { $0.parentId == parentId }
+        categories.filter { category in category.parentId == parentId }
     }
 
     func loadCategories(workspaceId: UUID) async {
@@ -92,15 +92,15 @@ final class CategoryViewModel {
             )
         )
 
-        if let idx = categories.firstIndex(where: { $0.id == category.id }) {
-            categories[idx] = category
+        if let index = categories.firstIndex(where: { existingCategory in existingCategory.id == category.id }) {
+            categories[index] = category
         }
     }
 
     func deleteCategory(_ category: Category) async throws {
         try await service.delete(from: "categories", id: category.id)
-        categories.removeAll { $0.id == category.id }
+        categories.removeAll { existingCategory in existingCategory.id == category.id }
         // Also remove subcategories
-        categories.removeAll { $0.parentId == category.id }
+        categories.removeAll { subcategory in subcategory.parentId == category.id }
     }
 }

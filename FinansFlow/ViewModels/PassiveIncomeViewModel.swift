@@ -9,7 +9,7 @@ final class PassiveIncomeViewModel {
     private let service = SupabaseService.shared
 
     var totalMonthlyPassiveIncome: Double {
-        passiveIncomes.reduce(0) { $0 + $1.monthlyAmount }
+        passiveIncomes.reduce(0) { sum, income in sum + income.monthlyAmount }
     }
 
     func passiveIncomeRatio(totalIncome: Double) -> Double {
@@ -67,7 +67,7 @@ final class PassiveIncomeViewModel {
             amount: amount,
             currency: currency,
             frequency: frequency.rawValue,
-            next_payment_date: nextPaymentDate.map { dateFormatter.string(from: $0) },
+            next_payment_date: nextPaymentDate.map { date in dateFormatter.string(from: date) },
             description: description
         )
 
@@ -96,18 +96,18 @@ final class PassiveIncomeViewModel {
                 type: income.type.rawValue,
                 amount: income.amount,
                 frequency: income.frequency.rawValue,
-                next_payment_date: income.nextPaymentDate.map { dateFormatter.string(from: $0) },
+                next_payment_date: income.nextPaymentDate.map { date in dateFormatter.string(from: date) },
                 description: income.description
             )
         )
 
-        if let idx = passiveIncomes.firstIndex(where: { $0.id == income.id }) {
-            passiveIncomes[idx] = income
+        if let index = passiveIncomes.firstIndex(where: { existingIncome in existingIncome.id == income.id }) {
+            passiveIncomes[index] = income
         }
     }
 
     func deletePassiveIncome(_ income: PassiveIncome) async throws {
         try await service.delete(from: "passive_incomes", id: income.id)
-        passiveIncomes.removeAll { $0.id == income.id }
+        passiveIncomes.removeAll { existingIncome in existingIncome.id == income.id }
     }
 }

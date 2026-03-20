@@ -232,25 +232,25 @@ struct DashboardView: View {
     }
 
     private var expenseByCategoryData: [CategoryChartData] {
-        let monthExpenses = transactionVM.transactions.filter {
-            $0.type == .expense && $0.date >= now.startOfMonth && $0.date <= now.endOfMonth
+        let monthExpenses = transactionVM.transactions.filter { transaction in
+            transaction.type == .expense && transaction.date >= now.startOfMonth && transaction.date <= now.endOfMonth
         }
-        let grouped = Dictionary(grouping: monthExpenses) { $0.categoryId }
-        let total = monthExpenses.reduce(0.0) { $0 + $1.amount }
+        let grouped = Dictionary(grouping: monthExpenses) { transaction in transaction.categoryId }
+        let total = monthExpenses.reduce(0.0) { sum, transaction in sum + transaction.amount }
         guard total > 0 else { return [] }
 
-        return grouped.compactMap { (catId, txs) -> CategoryChartData? in
-            let amount = txs.reduce(0.0) { $0 + $1.amount }
-            let cat = categoryVM.categories.first { $0.id == catId }
+        return grouped.compactMap { categoryId, transactionList -> CategoryChartData? in
+            let amount = transactionList.reduce(0.0) { sum, transaction in sum + transaction.amount }
+            let category = categoryVM.categories.first { existingCategory in existingCategory.id == categoryId }
             return CategoryChartData(
-                id: catId ?? UUID(),
-                name: cat?.name ?? String(localized: "Diğer"),
+                id: categoryId ?? UUID(),
+                name: category?.name ?? String(localized: "Diğer"),
                 amount: amount,
-                color: cat?.color ?? "#999999",
+                color: category?.color ?? "#999999",
                 percentage: (amount / total) * 100
             )
         }
-        .sorted { $0.amount > $1.amount }
+        .sorted { firstData, secondData in firstData.amount > secondData.amount }
     }
 
     // MARK: - Passive Income Mini Card
@@ -281,18 +281,18 @@ struct DashboardView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            let recurring = transactionVM.transactions.filter { $0.isRecurring }.prefix(3)
-            if recurring.isEmpty {
+            let recurringTransactions = transactionVM.transactions.filter { transaction in transaction.isRecurring }.prefix(3)
+            if recurringTransactions.isEmpty {
                 Text("Yok")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
-                ForEach(Array(recurring)) { tx in
+                ForEach(Array(recurringTransactions)) { transaction in
                     HStack {
                         Circle()
-                            .fill(tx.type == .income ? Color.green : Color.red)
+                            .fill(transaction.type == .income ? Color.green : Color.red)
                             .frame(width: 6, height: 6)
-                        Text(tx.description ?? String(localized: "İşlem"))
+                        Text(transaction.description ?? String(localized: "İşlem"))
                             .font(.caption)
                             .lineLimit(1)
                     }
@@ -327,12 +327,12 @@ struct DashboardView: View {
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 8)
             } else {
-                ForEach(recent) { tx in
+                ForEach(recent) { transaction in
                     TransactionRowView(
-                        transaction: tx,
-                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                        transaction: transaction,
+                        category: categoryVM.categories.first { existingCategory in existingCategory.id == transaction.categoryId }
                     )
-                    if tx.id != recent.last?.id {
+                    if transaction.id != recent.last?.id {
                         Divider()
                     }
                 }

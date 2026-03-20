@@ -14,27 +14,27 @@ final class TransactionViewModel {
     // MARK: - Computed
 
     var incomeTransactions: [Transaction] {
-        transactions.filter { $0.type == .income }
+        transactions.filter { transaction in transaction.type == .income }
     }
 
     var expenseTransactions: [Transaction] {
-        transactions.filter { $0.type == .expense }
+        transactions.filter { transaction in transaction.type == .expense }
     }
 
     func totalIncome(for month: Date) -> Double {
         let start = month.startOfMonth
         let end = month.endOfMonth
         return transactions
-            .filter { $0.type == .income && $0.date >= start && $0.date <= end }
-            .reduce(0) { $0 + $1.amount }
+            .filter { transaction in transaction.type == .income && transaction.date >= start && transaction.date <= end }
+            .reduce(0) { sum, transaction in sum + transaction.amount }
     }
 
     func totalExpense(for month: Date) -> Double {
         let start = month.startOfMonth
         let end = month.endOfMonth
         return transactions
-            .filter { $0.type == .expense && $0.date >= start && $0.date <= end }
-            .reduce(0) { $0 + $1.amount }
+            .filter { transaction in transaction.type == .expense && transaction.date >= start && transaction.date <= end }
+            .reduce(0) { sum, transaction in sum + transaction.amount }
     }
 
     func netCashFlow(for month: Date) -> Double {
@@ -47,8 +47,12 @@ final class TransactionViewModel {
         let grouped = Dictionary(grouping: transactions) { transaction in
             transaction.date.displayString
         }
-        return grouped.map { (date: $0.key, transactions: $0.value) }
-            .sorted { $0.transactions.first?.date ?? Date() > $1.transactions.first?.date ?? Date() }
+        return grouped.map { dateString, transactionList in
+            (date: dateString, transactions: transactionList)
+        }
+        .sorted { firstGroup, secondGroup in
+            (firstGroup.transactions.first?.date ?? Date()) > (secondGroup.transactions.first?.date ?? Date())
+        }
     }
 
     // MARK: - CRUD
@@ -172,14 +176,14 @@ final class TransactionViewModel {
             )
         )
 
-        if let idx = transactions.firstIndex(where: { $0.id == transaction.id }) {
-            transactions[idx] = transaction
+        if let index = transactions.firstIndex(where: { existingTransaction in existingTransaction.id == transaction.id }) {
+            transactions[index] = transaction
         }
     }
 
     func deleteTransaction(_ transaction: Transaction) async throws {
         try await service.delete(from: "transactions", id: transaction.id)
-        transactions.removeAll { $0.id == transaction.id }
+        transactions.removeAll { existingTransaction in existingTransaction.id == transaction.id }
     }
 
     // MARK: - Filtering
@@ -191,15 +195,15 @@ final class TransactionViewModel {
         startDate: Date? = nil,
         endDate: Date? = nil
     ) -> [Transaction] {
-        transactions.filter { tx in
-            if let type, tx.type != type { return false }
-            if let categoryId, tx.categoryId != categoryId { return false }
+        transactions.filter { transaction in
+            if let type, transaction.type != type { return false }
+            if let categoryId, transaction.categoryId != categoryId { return false }
             if !searchText.isEmpty,
-               !(tx.description?.localizedCaseInsensitiveContains(searchText) ?? false) {
+               !(transaction.description?.localizedCaseInsensitiveContains(searchText) ?? false) {
                 return false
             }
-            if let startDate, tx.date < startDate { return false }
-            if let endDate, tx.date > endDate { return false }
+            if let startDate, transaction.date < startDate { return false }
+            if let endDate, transaction.date > endDate { return false }
             return true
         }
     }

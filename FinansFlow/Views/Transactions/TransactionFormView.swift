@@ -42,15 +42,17 @@ struct TransactionFormView: View {
                 Section("Detaylar") {
                     DatePicker("Tarih", selection: $date, displayedComponents: .date)
 
-                    let relevantCategories = categoryVM.categories.filter { $0.type == (type == .income ? .income : .expense) }
+                    let relevantCategories = categoryVM.categories.filter { category in
+                        category.type == (type == .income ? .income : .expense)
+                    }
                     Picker("Kategori", selection: $categoryId) {
                         Text("Seçiniz").tag(UUID?.none)
-                        ForEach(relevantCategories) { cat in
+                        ForEach(relevantCategories) { category in
                             HStack {
-                                Image(systemName: cat.icon)
-                                Text(cat.parentId != nil ? "  \(cat.name)" : cat.name)
+                                Image(systemName: category.icon)
+                                Text(category.parentId != nil ? "  \(category.name)" : category.name)
                             }
-                            .tag(UUID?.some(cat.id))
+                            .tag(UUID?.some(category.id))
                         }
                     }
 
@@ -108,19 +110,19 @@ struct TransactionFormView: View {
     }
 
     private func loadExisting() {
-        guard let tx = editingTransaction else {
+        guard let existingTransaction = editingTransaction else {
             type = transactionType
             return
         }
-        type = tx.type
-        amount = String(tx.amount)
-        date = tx.date
-        categoryId = tx.categoryId
-        description = tx.description ?? ""
-        paymentMethod = tx.paymentMethod ?? ""
-        visibilityScope = tx.visibilityScope
-        isRecurring = tx.isRecurring
-        recurrenceInterval = tx.recurrenceInterval ?? .monthly
+        type = existingTransaction.type
+        amount = String(existingTransaction.amount)
+        date = existingTransaction.date
+        categoryId = existingTransaction.categoryId
+        description = existingTransaction.description ?? ""
+        paymentMethod = existingTransaction.paymentMethod ?? ""
+        visibilityScope = existingTransaction.visibilityScope
+        isRecurring = existingTransaction.isRecurring
+        recurrenceInterval = existingTransaction.recurrenceInterval ?? .monthly
     }
 
     private func save() async {
