@@ -65,6 +65,11 @@ final class Investment {
         unitCost * quantity
     }
 
+    var currentUnitPrice: Double {
+        guard quantity > 0 else { return currentValue }
+        return currentValue / quantity
+    }
+
     var profitLoss: Double {
         currentValue - totalCost
     }

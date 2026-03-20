@@ -46,7 +46,7 @@ struct InvestmentFormView: View {
                         .keyboardType(.decimalPad)
                     TextField("Miktar/Adet", text: $quantity)
                         .keyboardType(.decimalPad)
-                    TextField("Güncel Değer", text: $currentValue)
+                    TextField("Güncel Birim Fiyat", text: $currentValue)
                         .keyboardType(.decimalPad)
 
                     Picker("Para Birimi", selection: $currency) {
@@ -89,7 +89,7 @@ struct InvestmentFormView: View {
         purchaseDate = inv.purchaseDate ?? Date()
         unitCost = String(inv.unitCost)
         quantity = String(inv.quantity)
-        currentValue = String(inv.currentValue)
+        currentValue = String(inv.currentUnitPrice)
         currency = inv.currency
         institution = inv.institution ?? ""
         notes = inv.notes ?? ""
@@ -98,7 +98,8 @@ struct InvestmentFormView: View {
     private func save() {
         let cost = Double(unitCost.replacingOccurrences(of: ",", with: ".")) ?? 0
         let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 0
-        let value = Double(currentValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let unitPrice = Double(currentValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let totalCurrentValue = qty > 0 ? unitPrice * qty : unitPrice
 
         if let existing = editingInvestment {
             existing.name = name
@@ -106,7 +107,7 @@ struct InvestmentFormView: View {
             existing.purchaseDate = purchaseDate
             existing.unitCost = cost
             existing.quantity = qty
-            existing.currentValue = value
+            existing.currentValue = totalCurrentValue
             existing.institution = institution.isEmpty ? nil : institution
             existing.notes = notes.isEmpty ? nil : notes
             viewModel.updateInvestment(existing, context: modelContext)
@@ -118,7 +119,7 @@ struct InvestmentFormView: View {
                 purchaseDate: purchaseDate,
                 unitCost: cost,
                 quantity: qty,
-                currentValue: value,
+                currentValue: totalCurrentValue,
                 currency: currency,
                 institution: institution.isEmpty ? nil : institution,
                 notes: notes.isEmpty ? nil : notes
