@@ -6,19 +6,33 @@ struct DashboardView: View {
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
     @Bindable var workspaceVM: WorkspaceViewModel
+    @Bindable var netWorthVM: NetWorthViewModel
+    @Bindable var liabilityVM: LiabilityViewModel
 
     @State private var showAddIncome = false
     @State private var showAddExpense = false
 
     init(transactionVM: TransactionViewModel = TransactionViewModel(),
          categoryVM: CategoryViewModel = CategoryViewModel(),
-         workspaceVM: WorkspaceViewModel = WorkspaceViewModel()) {
+         workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
+         netWorthVM: NetWorthViewModel = NetWorthViewModel(),
+         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
         self.workspaceVM = workspaceVM
+        self.netWorthVM = netWorthVM
+        self.liabilityVM = liabilityVM
     }
 
     private let now = Date()
+
+    private var netWorthSummary: DashboardNetWorthSummary {
+        DashboardMetrics.netWorthSummary(
+            assets: netWorthVM.assets,
+            liabilities: liabilityVM.liabilities,
+            snapshots: netWorthVM.snapshots
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -83,11 +97,48 @@ struct DashboardView: View {
             Text("NET VARLIK")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text("--")
-                .font(.title.bold())
-            Text("Hesaplama için varlık/borç ekleyin")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            if netWorthSummary.hasAnyData {
+                Text(netWorthSummary.netWorth.formatted())
+                    .font(.title.bold())
+                    .foregroundStyle(netWorthSummary.isPositive ? Color.primary : Color.red)
+
+                HStack(spacing: 20) {
+                    VStack(spacing: 2) {
+                        Text("Varlıklar")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(netWorthSummary.totalAssets.formatted())
+                            .font(.caption.bold())
+                            .foregroundStyle(.green)
+                    }
+
+                    VStack(spacing: 2) {
+                        Text("Borçlar")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(netWorthSummary.totalLiabilities.formatted())
+                            .font(.caption.bold())
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                if let deltaText = netWorthSummary.deltaText {
+                    Text(deltaText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("İlk karşılaştırma için snapshot kaydedin")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("--")
+                    .font(.title.bold())
+                Text("Hesaplama için varlık veya borç ekleyin")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding()

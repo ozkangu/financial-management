@@ -19,7 +19,9 @@ struct ContentView: View {
             DashboardView(
                 transactionVM: transactionVM,
                 categoryVM: categoryVM,
-                workspaceVM: workspaceVM
+                workspaceVM: workspaceVM,
+                netWorthVM: netWorthVM,
+                liabilityVM: liabilityVM
             )
             .tabItem {
                 Label("Dashboard", systemImage: "chart.bar.fill")
