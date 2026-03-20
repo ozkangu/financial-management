@@ -56,7 +56,7 @@ struct NetWorthView: View {
                     }
                     .buttonStyle(.bordered)
                     .padding(.horizontal)
-                    .accessibilityLabel("Net varlık snapshot'ı kaydet")
+                    .accessibilityLabel(String(localized: "Net varlık snapshot'ı kaydet"))
                 }
                 .padding(.vertical)
             }

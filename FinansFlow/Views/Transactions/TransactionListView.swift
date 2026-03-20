@@ -208,7 +208,7 @@ struct TransactionRowView: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(category?.name ?? "Kategori Yok")
+                Text(category?.name ?? String(localized: "Kategori Yok"))
                     .font(.subheadline.weight(.medium))
                 if let desc = transaction.description, !desc.isEmpty {
                     Text(desc)
@@ -233,7 +233,7 @@ struct TransactionRowView: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(category?.name ?? "Kategori Yok"), \(transaction.type == .income ? "gelir" : "gider"), \(transaction.amount.formatted())")
+        .accessibilityLabel("\(category?.name ?? String(localized: "Kategori Yok")), \(transaction.type == .income ? String(localized: "gelir") : String(localized: "gider")), \(transaction.amount.formatted())")
     }
 }
 

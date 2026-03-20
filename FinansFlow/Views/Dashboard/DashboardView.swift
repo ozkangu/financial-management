@@ -147,8 +147,8 @@ struct DashboardView: View {
                     .foregroundStyle(by: .value("Tür", item.type))
                 }
                 .chartForegroundStyleScale([
-                    "Gelir": Color.green,
-                    "Gider": Color.red
+                    String(localized: "Gelir"): Color.green,
+                    String(localized: "Gider"): Color.red
                 ])
                 .frame(height: 180)
             }
@@ -168,8 +168,8 @@ struct DashboardView: View {
             let expense = transactionVM.totalExpense(for: month)
             let label = month.monthYearString
             if income > 0 || expense > 0 {
-                data.append(MonthlyChartData(month: label, type: "Gelir", amount: income))
-                data.append(MonthlyChartData(month: label, type: "Gider", amount: expense))
+                data.append(MonthlyChartData(month: label, type: String(localized: "Gelir"), amount: income))
+                data.append(MonthlyChartData(month: label, type: String(localized: "Gider"), amount: expense))
             }
         }
         return data
@@ -244,7 +244,7 @@ struct DashboardView: View {
             let cat = categoryVM.categories.first { $0.id == catId }
             return CategoryChartData(
                 id: catId ?? UUID(),
-                name: cat?.name ?? "Diğer",
+                name: cat?.name ?? String(localized: "Diğer"),
                 amount: amount,
                 color: cat?.color ?? "#999999",
                 percentage: (amount / total) * 100
@@ -292,7 +292,7 @@ struct DashboardView: View {
                         Circle()
                             .fill(tx.type == .income ? Color.green : Color.red)
                             .frame(width: 6, height: 6)
-                        Text(tx.description ?? "İşlem")
+                        Text(tx.description ?? String(localized: "İşlem"))
                             .font(.caption)
                             .lineLimit(1)
                     }
@@ -370,7 +370,7 @@ struct DashboardView: View {
                 .clipShape(Circle())
                 .shadow(color: .accentColor.opacity(0.3), radius: 8, y: 4)
         }
-        .accessibilityLabel("Yeni işlem ekle")
+        .accessibilityLabel(String(localized: "Yeni işlem ekle"))
         .padding(.trailing, 20)
         .padding(.bottom, 20)
     }

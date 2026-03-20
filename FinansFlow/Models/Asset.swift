@@ -11,13 +11,13 @@ enum AssetType: String, Codable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .bankAccount: return "Banka Hesabı"
-        case .cash: return "Nakit"
-        case .investment: return "Yatırım"
-        case .realEstate: return "Gayrimenkul"
-        case .vehicle: return "Araç"
-        case .receivable: return "Alacak"
-        case .other: return "Diğer"
+        case .bankAccount: return String(localized: "Banka Hesabı")
+        case .cash: return String(localized: "Nakit")
+        case .investment: return String(localized: "Yatırım")
+        case .realEstate: return String(localized: "Gayrimenkul")
+        case .vehicle: return String(localized: "Araç")
+        case .receivable: return String(localized: "Alacak")
+        case .other: return String(localized: "Diğer")
         }
     }
 

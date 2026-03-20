@@ -17,7 +17,7 @@ struct SettingsView: View {
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading) {
-                        Text(authService.currentUser?.name ?? "Kullanıcı")
+                        Text(authService.currentUser?.name ?? String(localized: "Kullanıcı"))
                             .font(.headline)
                         Text(authService.currentUser?.email ?? "")
                             .font(.caption)
@@ -85,7 +85,7 @@ struct SettingsView: View {
 
     private func exportCSV() {
         // Create a simple CSV export placeholder
-        let csv = "Tarih,Tür,Tutar,Kategori,Açıklama\n"
+        let csv = String(localized: "Tarih,Tür,Tutar,Kategori,Açıklama") + "\n"
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("finansflow_export.csv")
         try? csv.write(to: tempURL, atomically: true, encoding: .utf8)
         exportURL = tempURL

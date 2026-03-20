@@ -10,12 +10,12 @@ enum PassiveIncomeType: String, Codable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .dividend: return "Temettü"
-        case .interest: return "Faiz"
-        case .rent: return "Kira"
-        case .staking: return "Staking"
-        case .coupon: return "Kupon"
-        case .other: return "Diğer"
+        case .dividend: return String(localized: "Temettü")
+        case .interest: return String(localized: "Faiz")
+        case .rent: return String(localized: "Kira")
+        case .staking: return String(localized: "Staking")
+        case .coupon: return String(localized: "Kupon")
+        case .other: return String(localized: "Diğer")
         }
     }
 
@@ -38,9 +38,9 @@ enum PaymentFrequency: String, Codable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .monthly: return "Aylık"
-        case .quarterly: return "Çeyreklik"
-        case .yearly: return "Yıllık"
+        case .monthly: return String(localized: "Aylık")
+        case .quarterly: return String(localized: "Çeyreklik")
+        case .yearly: return String(localized: "Yıllık")
         }
     }
 

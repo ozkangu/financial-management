@@ -210,7 +210,7 @@ struct InvestmentRowView: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(investment.name), \(investment.type.displayName), değer: \(investment.currentValue.formatted())")
+        .accessibilityLabel("\(investment.name), \(investment.type.displayName), \(String(localized: "değer:")) \(investment.currentValue.formatted())")
     }
 }
 

@@ -141,6 +141,6 @@ struct LiabilityRowView: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(liability.name), \(liability.type.displayName), kalan: \(liability.remainingAmount.formatted())")
+        .accessibilityLabel("\(liability.name), \(liability.type.displayName), \(String(localized: "kalan:")) \(liability.remainingAmount.formatted())")
     }
 }

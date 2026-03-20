@@ -10,12 +10,12 @@ enum LiabilityType: String, Codable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .creditCard: return "Kredi Kartı"
-        case .personalLoan: return "İhtiyaç Kredisi"
-        case .mortgage: return "Konut Kredisi"
-        case .autoLoan: return "Araç Kredisi"
-        case .personalDebt: return "Şahsi Borç"
-        case .other: return "Diğer"
+        case .creditCard: return String(localized: "Kredi Kartı")
+        case .personalLoan: return String(localized: "İhtiyaç Kredisi")
+        case .mortgage: return String(localized: "Konut Kredisi")
+        case .autoLoan: return String(localized: "Araç Kredisi")
+        case .personalDebt: return String(localized: "Şahsi Borç")
+        case .other: return String(localized: "Diğer")
         }
     }
 

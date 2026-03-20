@@ -26,6 +26,10 @@ struct TransactionFormView: View {
 
     private let paymentMethods = ["Nakit", "Kredi Kartı", "Banka Kartı", "Havale/EFT", "Diğer"]
 
+    private func localizedPaymentMethod(_ method: String) -> String {
+        String(localized: String.LocalizationValue(method))
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -56,7 +60,7 @@ struct TransactionFormView: View {
                         Picker("Ödeme Yöntemi", selection: $paymentMethod) {
                             Text("Seçiniz").tag("")
                             ForEach(paymentMethods, id: \.self) { method in
-                                Text(method).tag(method)
+                                Text(localizedPaymentMethod(method)).tag(method)
                             }
                         }
                     }

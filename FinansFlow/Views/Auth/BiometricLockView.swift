@@ -54,7 +54,7 @@ struct BiometricLockView: View {
             return
         }
 
-        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Uygulamaya erişmek için kimlik doğrulayın") { success, _ in
+        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: String(localized: "Uygulamaya erişmek için kimlik doğrulayın")) { success, _ in
             DispatchQueue.main.async {
                 if success {
                     onUnlock()

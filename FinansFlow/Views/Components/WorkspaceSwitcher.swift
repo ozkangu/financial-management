@@ -19,7 +19,7 @@ struct WorkspaceSwitcher: View {
             }
         } label: {
             HStack(spacing: 4) {
-                Text(viewModel.activeWorkspace?.name ?? "Workspace")
+                Text(viewModel.activeWorkspace?.name ?? String(localized: "Workspace"))
                     .font(.headline)
                 Image(systemName: "chevron.down")
                     .font(.caption)

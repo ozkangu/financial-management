@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LoadingView: View {
-    var message: String = "Yükleniyor..."
+    var message: LocalizedStringKey = "Yükleniyor..."
 
     var body: some View {
         VStack(spacing: 12) {

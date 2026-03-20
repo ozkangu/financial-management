@@ -14,16 +14,16 @@ enum InvestmentType: String, Codable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .stock: return "Hisse Senedi"
-        case .fundEtf: return "Fon/ETF"
-        case .gold: return "Altın"
-        case .forex: return "Döviz"
-        case .crypto: return "Kripto"
-        case .realEstate: return "Gayrimenkul"
-        case .deposit: return "Mevduat"
-        case .retirement: return "BES"
-        case .bond: return "Tahvil/Bono"
-        case .other: return "Diğer"
+        case .stock: return String(localized: "Hisse Senedi")
+        case .fundEtf: return String(localized: "Fon/ETF")
+        case .gold: return String(localized: "Altın")
+        case .forex: return String(localized: "Döviz")
+        case .crypto: return String(localized: "Kripto")
+        case .realEstate: return String(localized: "Gayrimenkul")
+        case .deposit: return String(localized: "Mevduat")
+        case .retirement: return String(localized: "BES")
+        case .bond: return String(localized: "Tahvil/Bono")
+        case .other: return String(localized: "Diğer")
         }
     }
 

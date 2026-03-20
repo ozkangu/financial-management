@@ -4,7 +4,7 @@ struct OnboardingView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var currentPage = 0
 
-    private let pages: [(icon: String, title: String, description: String)] = [
+    private let pages: [(icon: String, title: LocalizedStringKey, description: LocalizedStringKey)] = [
         ("chart.bar.fill", "Gelir & Gider Takibi", "Tüm gelir ve giderlerini kategori bazlı takip et, aylık nakit akışını kontrol altında tut."),
         ("chart.pie.fill", "Yatırım Portföyü", "Hisse, fon, kripto ve diğer yatırımlarını tek yerden yönet, kar/zarar durumunu izle."),
         ("banknote.fill", "Net Varlık", "Varlıkların ve borçlarını gör, toplam net varlığını zaman içinde takip et."),
@@ -41,7 +41,13 @@ struct OnboardingView: View {
                     hasSeenOnboarding = true
                 }
             } label: {
-                Text(currentPage < pages.count - 1 ? "Devam" : "Başla")
+                Group {
+                    if currentPage < pages.count - 1 {
+                        Text("Devam")
+                    } else {
+                        Text("Başla")
+                    }
+                }
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
