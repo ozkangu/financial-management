@@ -67,6 +67,22 @@ final class AuthService {
         }
     }
 
+    func signInWithApple(idToken: String) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let session = try await client.auth.signInWithIdToken(
+                credentials: .init(provider: .apple, idToken: idToken)
+            )
+            isAuthenticated = true
+            await fetchUserProfile(userId: session.user.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func signOut() async {
         do {
             try await client.auth.signOut()
