@@ -4,9 +4,12 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @AppStorage("preferredCurrency") private var preferredCurrency = AppConstants.defaultCurrency
+    @Bindable var transactionVM: TransactionViewModel
+    @Bindable var categoryVM: CategoryViewModel
 
     @State private var showExportSheet = false
     @State private var exportURL: URL?
+    @State private var exportError: String?
 
     var body: some View {
         Form {
@@ -65,14 +68,30 @@ struct SettingsView: View {
                 ShareSheet(items: [url])
             }
         }
+        .alert("Islem Basarisiz", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "Bilinmeyen hata")
+        }
     }
 
     private func exportCSV() {
-        let csv = String(localized: "Tarih,Tür,Tutar,Kategori,Açıklama") + "\n"
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("finansflow_export.csv")
-        try? csv.write(to: tempURL, atomically: true, encoding: .utf8)
-        exportURL = tempURL
-        showExportSheet = true
+        let csv = CSVExportBuilder.transactionsCSV(
+            transactions: transactionVM.transactions,
+            categories: categoryVM.categories
+        )
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("finansflow-transactions.csv")
+
+        do {
+            try csv.write(to: tempURL, atomically: true, encoding: .utf8)
+            exportURL = tempURL
+            showExportSheet = true
+        } catch {
+            exportError = error.localizedDescription
+        }
     }
 }
 
@@ -84,4 +103,46 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+enum CSVExportBuilder {
+    static func transactionsCSV(
+        transactions: [Transaction],
+        categories: [Category]
+    ) -> String {
+        let header = [
+            "Tarih",
+            "Tur",
+            "Tutar",
+            "Para Birimi",
+            "Kategori",
+            "Aciklama"
+        ].map(csvField).joined(separator: ",")
+
+        let rows = transactions
+            .sorted { $0.date > $1.date }
+            .map { transaction -> String in
+                let categoryName = transaction.category?.name
+                    ?? categories.first(where: { $0.id == transaction.category?.id })?.name
+                    ?? "Kategori Yok"
+
+                return [
+                    transaction.date.displayString,
+                    transaction.type == .income ? "Gelir" : "Gider",
+                    transaction.amount.formatted(),
+                    transaction.currency,
+                    categoryName,
+                    transaction.descriptionText ?? ""
+                ]
+                .map(csvField)
+                .joined(separator: ",")
+            }
+
+        return ([header] + rows).joined(separator: "\n")
+    }
+
+    private static func csvField(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escaped)\""
+    }
 }

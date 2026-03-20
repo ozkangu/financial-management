@@ -12,9 +12,16 @@ struct TransactionListView: View {
     @State private var showAddExpense = false
     @State private var editingTransaction: Transaction?
     @State private var showFilter = false
+    @State private var selectedCategory: Category?
+    @State private var useStartDate = false
+    @State private var startDate = Date().startOfMonth
+    @State private var useEndDate = false
+    @State private var endDate = Date()
 
-    init(transactionVM: TransactionViewModel = TransactionViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel()) {
+    init(
+        transactionVM: TransactionViewModel = TransactionViewModel(),
+        categoryVM: CategoryViewModel = CategoryViewModel()
+    ) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
     }
@@ -33,26 +40,48 @@ struct TransactionListView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
+                if hasActiveFilters {
+                    activeFiltersBar
+                }
+
                 let filtered = transactionVM.filteredTransactions(
                     type: selectedType,
+                    category: selectedCategory,
                     searchText: searchText
-                )
+                ).filter { transaction in
+                    if useStartDate, transaction.date < startDate { return false }
+                    if useEndDate, transaction.date > endDate { return false }
+                    return true
+                }
 
                 if filtered.isEmpty && !transactionVM.isLoading {
-                    EmptyStateView(
-                        icon: "tray.fill",
-                        title: "Henüz İşlem Yok",
-                        description: "İlk gelir veya gider kaydınızı oluşturun",
-                        actionTitle: "İşlem Ekle"
-                    ) {
-                        showAddExpense = true
+                    if isFilterResultEmpty {
+                        EmptyStateView(
+                            icon: "line.3.horizontal.decrease.circle",
+                            title: "Sonuc Bulunamadi",
+                            description: "Secili filtreler veya arama sonucu eslesen islem yok",
+                            actionTitle: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? "Filtreleri Temizle"
+                                : "Arama ve Filtreleri Temizle"
+                        ) {
+                            clearFilters()
+                        }
+                    } else {
+                        EmptyStateView(
+                            icon: "tray.fill",
+                            title: "Henüz İşlem Yok",
+                            description: "İlk gelir veya gider kaydınızı oluşturun",
+                            actionTitle: "İşlem Ekle"
+                        ) {
+                            showAddExpense = true
+                        }
                     }
                 } else {
                     List {
                         let grouped = Dictionary(grouping: filtered) { $0.date.displayString }
                         let sortedDates = grouped.keys.sorted { key1, key2 in
-                            let txs1 = grouped[key1]!
-                            let txs2 = grouped[key2]!
+                            let txs1 = grouped[key1] ?? []
+                            let txs2 = grouped[key2] ?? []
                             return (txs1.first?.date ?? Date()) > (txs2.first?.date ?? Date())
                         }
 
@@ -95,6 +124,14 @@ struct TransactionListView: View {
             }
             .navigationTitle("İşlemler")
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showFilter = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -126,14 +163,74 @@ struct TransactionListView: View {
                     transactionType: .expense
                 )
             }
-            .sheet(item: $editingTransaction) { tx in
+            .sheet(item: $editingTransaction) { transaction in
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    editingTransaction: tx
+                    editingTransaction: transaction
+                )
+            }
+            .sheet(isPresented: $showFilter) {
+                TransactionFilterSheetView(
+                    categoryVM: categoryVM,
+                    selectedType: selectedType,
+                    selectedCategory: $selectedCategory,
+                    useStartDate: $useStartDate,
+                    startDate: $startDate,
+                    useEndDate: $useEndDate,
+                    endDate: $endDate
                 )
             }
         }
+    }
+
+    private var hasActiveFilters: Bool {
+        selectedCategory != nil ||
+        useStartDate ||
+        useEndDate ||
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isFilterResultEmpty: Bool {
+        !transactionVM.transactions.isEmpty && hasActiveFilters
+    }
+
+    private var activeFiltersBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if let selectedCategory {
+                    FilterChip(label: selectedCategory.name) {
+                        self.selectedCategory = nil
+                    }
+                }
+
+                if useStartDate {
+                    FilterChip(label: "Başlangıç: \(startDate.displayString)") {
+                        useStartDate = false
+                    }
+                }
+
+                if useEndDate {
+                    FilterChip(label: "Bitiş: \(endDate.displayString)") {
+                        useEndDate = false
+                    }
+                }
+
+                Button("Temizle") {
+                    clearFilters()
+                }
+                .font(.caption.weight(.semibold))
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
+    }
+
+    private func clearFilters() {
+        selectedCategory = nil
+        useStartDate = false
+        useEndDate = false
+        searchText = ""
     }
 }
 
@@ -225,6 +322,87 @@ struct TransactionRowView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(category?.name ?? String(localized: "Kategori Yok")), \(transaction.type == .income ? String(localized: "gelir") : String(localized: "gider")), \(transaction.amount.formatted())")
+    }
+}
+
+struct TransactionFilterSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var categoryVM: CategoryViewModel
+    let selectedType: TransactionType?
+
+    @Binding var selectedCategory: Category?
+    @Binding var useStartDate: Bool
+    @Binding var startDate: Date
+    @Binding var useEndDate: Bool
+    @Binding var endDate: Date
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Kategori") {
+                    Picker("Kategori", selection: $selectedCategory) {
+                        Text("Tümü").tag(Category?.none)
+                        ForEach(availableCategories) { category in
+                            Text(category.name).tag(Category?.some(category))
+                        }
+                    }
+                }
+
+                Section("Tarih Aralığı") {
+                    Toggle("Başlangıç Tarihi", isOn: $useStartDate)
+                    if useStartDate {
+                        DatePicker("Başlangıç", selection: $startDate, displayedComponents: .date)
+                    }
+
+                    Toggle("Bitiş Tarihi", isOn: $useEndDate)
+                    if useEndDate {
+                        DatePicker("Bitiş", selection: $endDate, displayedComponents: .date)
+                    }
+                }
+            }
+            .navigationTitle("Filtreler")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Kapat") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Sıfırla") {
+                        selectedCategory = nil
+                        useStartDate = false
+                        useEndDate = false
+                    }
+                }
+            }
+        }
+    }
+
+    private var availableCategories: [Category] {
+        guard let selectedType else { return categoryVM.categories }
+        return categoryVM.categories.filter { $0.type.rawValue == selectedType.rawValue }
+    }
+}
+
+struct FilterChip: View {
+    let label: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.caption)
+            Button {
+                onRemove()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.systemGray6))
+        .clipShape(Capsule())
     }
 }
 

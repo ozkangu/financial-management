@@ -14,7 +14,10 @@ struct ContentView: View {
         TabView {
             DashboardView(
                 transactionVM: transactionVM,
-                categoryVM: categoryVM
+                categoryVM: categoryVM,
+                passiveIncomeVM: passiveIncomeVM,
+                netWorthVM: netWorthVM,
+                liabilityVM: liabilityVM
             )
             .tabItem {
                 Label("Dashboard", systemImage: "chart.bar.fill")
@@ -45,6 +48,7 @@ struct ContentView: View {
 
             MoreView(
                 categoryVM: categoryVM,
+                transactionVM: transactionVM,
                 investmentVM: investmentVM,
                 passiveIncomeVM: passiveIncomeVM,
                 liabilityVM: liabilityVM

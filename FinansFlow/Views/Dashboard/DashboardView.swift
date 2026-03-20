@@ -2,20 +2,70 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @Environment(\.modelContext) private var modelContext
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
+    @Bindable var passiveIncomeVM: PassiveIncomeViewModel
+    @Bindable var netWorthVM: NetWorthViewModel
+    @Bindable var liabilityVM: LiabilityViewModel
 
     @State private var showAddIncome = false
     @State private var showAddExpense = false
 
-    init(transactionVM: TransactionViewModel = TransactionViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel()) {
+    init(
+        transactionVM: TransactionViewModel = TransactionViewModel(),
+        categoryVM: CategoryViewModel = CategoryViewModel(),
+        passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
+        netWorthVM: NetWorthViewModel = NetWorthViewModel(),
+        liabilityVM: LiabilityViewModel = LiabilityViewModel()
+    ) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
+        self.passiveIncomeVM = passiveIncomeVM
+        self.netWorthVM = netWorthVM
+        self.liabilityVM = liabilityVM
     }
 
     private let now = Date()
+
+    private var netWorthSummary: DashboardNetWorthSummary {
+        DashboardMetrics.netWorthSummary(
+            assets: netWorthVM.assets,
+            liabilities: liabilityVM.liabilities,
+            snapshots: netWorthVM.snapshots
+        )
+    }
+
+    private var passiveIncomeSummary: DashboardPassiveIncomeSummary {
+        DashboardMetrics.passiveIncomeSummary(
+            passiveIncomes: passiveIncomeVM.passiveIncomes,
+            totalMonthlyIncome: transactionVM.totalIncome(for: now)
+        )
+    }
+
+    private var insights: [DashboardInsightItem] {
+        DashboardMetrics.insights(
+            transactions: transactionVM.transactions,
+            categories: categoryVM.categories,
+            liabilities: liabilityVM.liabilities,
+            referenceDate: now
+        )
+    }
+
+    private var budgetSummaries: [DashboardCategoryBudgetSummary] {
+        DashboardMetrics.categoryBudgetSummaries(
+            categories: categoryVM.categories,
+            transactions: transactionVM.transactions,
+            referenceDate: now
+        )
+    }
+
+    private var topBudgetAlert: DashboardCategoryBudgetSummary? {
+        DashboardMetrics.topBudgetAlert(
+            categories: categoryVM.categories,
+            transactions: transactionVM.transactions,
+            referenceDate: now
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,6 +82,8 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
 
+                    budgetSection
+                    insightsSection
                     recentTransactionsSection
                 }
                 .padding(.vertical)
@@ -57,18 +109,53 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Net Worth Card
-
     private var netWorthCard: some View {
         VStack(spacing: 8) {
             Text("NET VARLIK")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text("--")
-                .font(.title.bold())
-            Text("Hesaplama için varlık/borç ekleyin")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            if netWorthSummary.hasAnyData {
+                Text(netWorthSummary.netWorth.formatted())
+                    .font(.title.bold())
+                    .foregroundStyle(netWorthSummary.isPositive ? Color.primary : .red)
+
+                HStack(spacing: 20) {
+                    VStack(spacing: 2) {
+                        Text("Varlıklar")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(netWorthSummary.totalAssets.formatted())
+                            .font(.caption.bold())
+                            .foregroundStyle(.green)
+                    }
+
+                    VStack(spacing: 2) {
+                        Text("Borçlar")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(netWorthSummary.totalLiabilities.formatted())
+                            .font(.caption.bold())
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                if let deltaText = netWorthSummary.deltaText {
+                    Text(deltaText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("İlk karşılaştırma için snapshot kaydedin")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("--")
+                    .font(.title.bold())
+                Text("Hesaplama için varlık veya borç ekleyin")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding()
@@ -77,8 +164,6 @@ struct DashboardView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .padding(.horizontal)
     }
-
-    // MARK: - Monthly Summary Cards
 
     private var monthlySummaryCards: some View {
         HStack(spacing: 12) {
@@ -103,8 +188,6 @@ struct DashboardView: View {
         }
         .padding(.horizontal)
     }
-
-    // MARK: - Cash Flow Chart (6 months)
 
     private var cashFlowChart: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -155,8 +238,6 @@ struct DashboardView: View {
         }
         return data
     }
-
-    // MARK: - Expense Category Donut Chart
 
     private var expenseCategoryChart: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -221,30 +302,51 @@ struct DashboardView: View {
 
         return grouped.compactMap { (catId, txs) -> CategoryChartData? in
             let amount = txs.reduce(0.0) { $0 + $1.amount }
-            let cat = txs.first?.category
+            let category = txs.first?.category
             return CategoryChartData(
                 id: catId ?? UUID(),
-                name: cat?.name ?? String(localized: "Diğer"),
+                name: category?.name ?? String(localized: "Diğer"),
                 amount: amount,
-                color: cat?.color ?? "#999999",
+                color: category?.color ?? "#999999",
                 percentage: (amount / total) * 100
             )
         }
         .sorted { $0.amount > $1.amount }
     }
 
-    // MARK: - Passive Income Mini Card
-
     private var passiveIncomeMiniCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("PASİF GELİR")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text("--/ay")
-                .font(.headline)
-            Text("Oran: --%")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            if passiveIncomeSummary.hasAnyData {
+                Text("\(passiveIncomeSummary.monthlyAmount.formatted())/ay")
+                    .font(.headline)
+                    .foregroundStyle(.green)
+
+                Text(passiveIncomeSummary.ratioText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let nextPaymentText = passiveIncomeSummary.nextPaymentText {
+                    Text(nextPaymentText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                } else {
+                    Text("Siradaki odeme tarihi yok")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                Text("Pasif gelir kaydi yok")
+                    .font(.subheadline.weight(.medium))
+                Text("Temettu, kira veya faiz geliri ekleyin")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -252,8 +354,6 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
-
-    // MARK: - Upcoming Payments
 
     private var upcomingPaymentsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -286,7 +386,80 @@ struct DashboardView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 
-    // MARK: - Recent Transactions
+    private var budgetSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("BUTCE TAKIBI")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if let topBudgetAlert {
+                Text(budgetAlertText(for: topBudgetAlert))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(topBudgetAlert.status == .exceeded ? .red : .orange)
+            } else if budgetSummaries.isEmpty {
+                Text("Butceli kategori bulunmuyor. Kategori ekranindan aylik butce ekleyin.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Tum butceler bu ay plan dahilinde ilerliyor.")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+            }
+
+            ForEach(Array(budgetSummaries.prefix(3))) { summary in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(summary.name)
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Text("\(summary.spent.formatted()) / \(summary.budget.formatted())")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(summaryColor(for: summary))
+                    }
+
+                    ProgressView(value: min(summary.utilization, 1.0))
+                        .tint(summaryColor(for: summary))
+
+                    Text(budgetStatusText(for: summary))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .padding(.horizontal)
+    }
+
+    private var insightsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ICGORULER")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(insights) { insight in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(insight.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(insight.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                }
+
+                if insight.id != insights.last?.id {
+                    Divider()
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .padding(.horizontal)
+    }
 
     private var recentTransactionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -307,12 +480,12 @@ struct DashboardView: View {
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 8)
             } else {
-                ForEach(recent) { tx in
+                ForEach(recent) { transaction in
                     TransactionRowView(
-                        transaction: tx,
-                        category: tx.category
+                        transaction: transaction,
+                        category: transaction.category
                     )
-                    if tx.id != recent.last?.id {
+                    if transaction.id != recent.last?.id {
                         Divider()
                     }
                 }
@@ -324,8 +497,6 @@ struct DashboardView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .padding(.horizontal)
     }
-
-    // MARK: - FAB
 
     private var floatingActionButton: some View {
         Menu {
@@ -356,7 +527,38 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Supporting Views
+private extension DashboardView {
+    func summaryColor(for summary: DashboardCategoryBudgetSummary) -> Color {
+        switch summary.status {
+        case .onTrack:
+            return .green
+        case .warning:
+            return .orange
+        case .exceeded:
+            return .red
+        }
+    }
+
+    func budgetAlertText(for summary: DashboardCategoryBudgetSummary) -> String {
+        switch summary.status {
+        case .exceeded:
+            return "\(summary.name) butcesi \(abs(summary.remaining).formatted()) asildi."
+        case .warning:
+            return "\(summary.name) butcesinin \(Int(summary.utilization * 100))% seviyesine ulasildi."
+        case .onTrack:
+            return "\(summary.name) butcesi plan dahilinde ilerliyor."
+        }
+    }
+
+    func budgetStatusText(for summary: DashboardCategoryBudgetSummary) -> String {
+        switch summary.status {
+        case .exceeded:
+            return "Butce asimi: \(abs(summary.remaining).formatted())"
+        case .warning, .onTrack:
+            return "Kalan butce: \(max(summary.remaining, 0).formatted())"
+        }
+    }
+}
 
 struct DashboardSummaryCard: View {
     let title: String
@@ -388,8 +590,6 @@ struct DashboardSummaryCard: View {
     }
 }
 
-// MARK: - Chart Data Models
-
 struct MonthlyChartData: Identifiable {
     let id = UUID()
     let month: String
@@ -407,5 +607,15 @@ struct CategoryChartData: Identifiable {
 
 #Preview {
     DashboardView()
-        .modelContainer(for: [Category.self, Transaction.self], inMemory: true)
+        .modelContainer(
+            for: [
+                Category.self,
+                Transaction.self,
+                PassiveIncome.self,
+                Asset.self,
+                Liability.self,
+                NetWorthSnapshot.self
+            ],
+            inMemory: true
+        )
 }

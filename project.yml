@@ -71,4 +71,3 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.finansflow.app.uitests
         GENERATE_INFOPLIST_FILE: true
-

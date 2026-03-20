@@ -1,12 +1,12 @@
 import Foundation
 import SwiftData
 
-enum TransactionType: String, Codable, Sendable, CaseIterable {
+enum TransactionType: String, Codable, Sendable, CaseIterable, Hashable {
     case income
     case expense
 }
 
-enum RecurrenceInterval: String, Codable, Sendable, CaseIterable {
+enum RecurrenceInterval: String, Codable, Sendable, CaseIterable, Hashable {
     case weekly
     case monthly
     case yearly

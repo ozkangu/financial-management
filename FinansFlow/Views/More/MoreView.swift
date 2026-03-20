@@ -2,15 +2,20 @@ import SwiftUI
 
 struct MoreView: View {
     @Bindable var categoryVM: CategoryViewModel
+    @Bindable var transactionVM: TransactionViewModel
     @Bindable var investmentVM: InvestmentViewModel
     @Bindable var passiveIncomeVM: PassiveIncomeViewModel
     @Bindable var liabilityVM: LiabilityViewModel
 
-    init(categoryVM: CategoryViewModel = CategoryViewModel(),
-         investmentVM: InvestmentViewModel = InvestmentViewModel(),
-         passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
-         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
+    init(
+        categoryVM: CategoryViewModel = CategoryViewModel(),
+        transactionVM: TransactionViewModel = TransactionViewModel(),
+        investmentVM: InvestmentViewModel = InvestmentViewModel(),
+        passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
+        liabilityVM: LiabilityViewModel = LiabilityViewModel()
+    ) {
         self.categoryVM = categoryVM
+        self.transactionVM = transactionVM
         self.investmentVM = investmentVM
         self.passiveIncomeVM = passiveIncomeVM
         self.liabilityVM = liabilityVM
@@ -21,7 +26,10 @@ struct MoreView: View {
             List {
                 Section("Finans") {
                     NavigationLink {
-                        CategoryListView(viewModel: categoryVM)
+                        CategoryListView(
+                            viewModel: categoryVM,
+                            transactionVM: transactionVM
+                        )
                     } label: {
                         Label("Kategoriler", systemImage: "folder.fill")
                     }
@@ -44,7 +52,10 @@ struct MoreView: View {
 
                 Section("Uygulama") {
                     NavigationLink {
-                        SettingsView()
+                        SettingsView(
+                            transactionVM: transactionVM,
+                            categoryVM: categoryVM
+                        )
                     } label: {
                         Label("Ayarlar", systemImage: "gearshape.fill")
                     }

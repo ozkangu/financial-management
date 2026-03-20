@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-enum CategoryType: String, Codable, Sendable, CaseIterable {
+enum CategoryType: String, Codable, Sendable, CaseIterable, Hashable {
     case income
     case expense
 }

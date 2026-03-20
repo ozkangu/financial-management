@@ -4,6 +4,7 @@ import SwiftData
 struct CategoryListView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: CategoryViewModel
+    @Bindable var transactionVM: TransactionViewModel
 
     @State private var selectedType: CategoryType = .expense
     @State private var showAddSheet = false
@@ -26,30 +27,39 @@ struct CategoryListView: View {
 
             ForEach(parentCategories) { category in
                 Section {
-                    CategoryRowView(category: category)
-                        .onTapGesture { editingCategory = category }
+                    CategoryRowView(
+                        category: category,
+                        allCategories: viewModel.categories,
+                        transactions: transactionVM.transactions
+                    )
+                    .onTapGesture { editingCategory = category }
+                    .swipeActions(edge: .trailing) {
+                        if !category.isDefault {
+                            Button(role: .destructive) {
+                                viewModel.deleteCategory(category, context: modelContext)
+                            } label: {
+                                Label("Sil", systemImage: "trash")
+                            }
+                        }
+                    }
+
+                    ForEach(category.subcategories.sorted(by: { $0.name < $1.name })) { sub in
+                        CategoryRowView(
+                            category: sub,
+                            allCategories: viewModel.categories,
+                            transactions: transactionVM.transactions,
+                            isSubcategory: true
+                        )
+                        .onTapGesture { editingCategory = sub }
                         .swipeActions(edge: .trailing) {
-                            if !category.isDefault {
+                            if !sub.isDefault {
                                 Button(role: .destructive) {
-                                    viewModel.deleteCategory(category, context: modelContext)
+                                    viewModel.deleteCategory(sub, context: modelContext)
                                 } label: {
                                     Label("Sil", systemImage: "trash")
                                 }
                             }
                         }
-
-                    ForEach(category.subcategories) { sub in
-                        CategoryRowView(category: sub, isSubcategory: true)
-                            .onTapGesture { editingCategory = sub }
-                            .swipeActions(edge: .trailing) {
-                                if !sub.isDefault {
-                                    Button(role: .destructive) {
-                                        viewModel.deleteCategory(sub, context: modelContext)
-                                    } label: {
-                                        Label("Sil", systemImage: "trash")
-                                    }
-                                }
-                            }
                     }
                 }
             }
@@ -81,31 +91,61 @@ struct CategoryListView: View {
 
 struct CategoryRowView: View {
     let category: Category
+    let allCategories: [Category]
+    let transactions: [Transaction]
     var isSubcategory: Bool = false
+
+    private var budgetSummary: DashboardCategoryBudgetSummary? {
+        guard category.type == .expense, (category.monthlyBudget ?? 0) > 0 else { return nil }
+        return DashboardMetrics.categoryBudgetSummaries(
+            categories: allCategories,
+            transactions: transactions,
+            referenceDate: Date()
+        ).first(where: { $0.id == category.id })
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             if isSubcategory {
                 Spacer().frame(width: 20)
             }
+
             Image(systemName: category.icon)
                 .font(.title3)
                 .foregroundStyle(Color(hex: category.color))
                 .frame(width: 32)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(category.name)
                     .font(isSubcategory ? .subheadline : .headline)
-                if let budget = category.monthlyBudget, budget > 0 {
-                    Text("Bütçe: \(budget.formatted())")
+
+                if let budgetSummary {
+                    Text("Bütçe: \(budgetSummary.spent.formatted()) / \(budgetSummary.budget.formatted())")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    ProgressView(value: min(budgetSummary.utilization, 1.0))
+                        .tint(categoryBudgetColor(for: budgetSummary.status))
                 }
             }
+
             Spacer()
+
             Image(systemName: "chevron.right")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
+    }
+
+    private func categoryBudgetColor(for status: DashboardBudgetStatus) -> Color {
+        switch status {
+        case .onTrack:
+            return .green
+        case .warning:
+            return .orange
+        case .exceeded:
+            return .red
+        }
     }
 }
