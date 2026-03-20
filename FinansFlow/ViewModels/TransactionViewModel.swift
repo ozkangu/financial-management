@@ -194,6 +194,7 @@ final class TransactionViewModel {
     func filteredTransactions(
         type: TransactionType? = nil,
         categoryId: UUID? = nil,
+        visibilityScope: VisibilityScope? = nil,
         searchText: String = "",
         startDate: Date? = nil,
         endDate: Date? = nil
@@ -201,6 +202,7 @@ final class TransactionViewModel {
         transactions.filter { tx in
             if let type, tx.type != type { return false }
             if let categoryId, tx.categoryId != categoryId { return false }
+            if let visibilityScope, tx.visibilityScope != visibilityScope { return false }
             if !searchText.isEmpty,
                !(tx.description?.localizedCaseInsensitiveContains(searchText) ?? false) {
                 return false

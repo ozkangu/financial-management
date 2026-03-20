@@ -11,6 +11,12 @@ struct TransactionListView: View {
     @State private var showAddExpense = false
     @State private var editingTransaction: Transaction?
     @State private var showFilter = false
+    @State private var selectedCategoryId: UUID?
+    @State private var selectedVisibilityScope: VisibilityScope?
+    @State private var useStartDate = false
+    @State private var startDate = Date().startOfMonth
+    @State private var useEndDate = false
+    @State private var endDate = Date()
 
     init(transactionVM: TransactionViewModel = TransactionViewModel(),
          categoryVM: CategoryViewModel = CategoryViewModel(),
@@ -36,20 +42,41 @@ struct TransactionListView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
+                if hasActiveFilters {
+                    activeFiltersBar
+                }
+
                 // Transaction list
                 let filtered = transactionVM.filteredTransactions(
                     type: selectedType,
-                    searchText: searchText
+                    categoryId: selectedCategoryId,
+                    visibilityScope: selectedVisibilityScope,
+                    searchText: searchText,
+                    startDate: useStartDate ? startDate : nil,
+                    endDate: useEndDate ? endDate : nil
                 )
 
                 if filtered.isEmpty && !transactionVM.isLoading {
-                    EmptyStateView(
-                        icon: "tray.fill",
-                        title: "Henüz İşlem Yok",
-                        description: "İlk gelir veya gider kaydınızı oluşturun",
-                        actionTitle: "İşlem Ekle"
-                    ) {
-                        showAddExpense = true
+                    if isFilterResultEmpty {
+                        EmptyStateView(
+                            icon: "line.3.horizontal.decrease.circle",
+                            title: "Sonuc Bulunamadi",
+                            description: "Secili filtreler veya arama sonucu eslesen islem yok",
+                            actionTitle: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? "Filtreleri Temizle"
+                                : "Arama ve Filtreleri Temizle"
+                        ) {
+                            clearFilters()
+                        }
+                    } else {
+                        EmptyStateView(
+                            icon: "tray.fill",
+                            title: "Henüz İşlem Yok",
+                            description: "İlk gelir veya gider kaydınızı oluşturun",
+                            actionTitle: "İşlem Ekle"
+                        ) {
+                            showAddExpense = true
+                        }
                     }
                 } else {
                     List {
@@ -101,6 +128,14 @@ struct TransactionListView: View {
             }
             .navigationTitle("İşlemler")
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showFilter = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -142,7 +177,100 @@ struct TransactionListView: View {
                     editingTransaction: tx
                 )
             }
+            .sheet(isPresented: $showFilter) {
+                TransactionFilterSheetView(
+                    categoryVM: categoryVM,
+                    selectedType: selectedType,
+                    selectedCategoryId: $selectedCategoryId,
+                    selectedVisibilityScope: $selectedVisibilityScope,
+                    useStartDate: $useStartDate,
+                    startDate: $startDate,
+                    useEndDate: $useEndDate,
+                    endDate: $endDate
+                )
+            }
+            .onChange(of: selectedType) { _, newValue in
+                normalizeCategoryFilter(selectedType: newValue)
+            }
+            .onChange(of: workspaceId) { _, _ in
+                normalizeCategoryFilter(selectedType: selectedType, resetIfMissing: true)
+            }
+            .onChange(of: categoryVM.categories.map(\.id)) { _, _ in
+                normalizeCategoryFilter(selectedType: selectedType, resetIfMissing: true)
+            }
         }
+    }
+
+    private var hasActiveFilters: Bool {
+        selectedCategoryId != nil || selectedVisibilityScope != nil || useStartDate || useEndDate
+    }
+
+    private var isFilterResultEmpty: Bool {
+        TransactionFilterSupport.isFilterResultEmpty(
+            hasTransactions: !transactionVM.transactions.isEmpty,
+            hasActiveFilters: hasActiveFilters,
+            searchText: searchText
+        )
+    }
+
+    private var activeFiltersBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if let selectedCategoryId,
+                   let category = categoryVM.categories.first(where: { $0.id == selectedCategoryId }) {
+                    FilterChip(label: category.name) {
+                        self.selectedCategoryId = nil
+                    }
+                }
+
+                if let selectedVisibilityScope {
+                    FilterChip(
+                        label: selectedVisibilityScope == .personal ? "Kişisel" : "Ortak"
+                    ) {
+                        self.selectedVisibilityScope = nil
+                    }
+                }
+
+                if useStartDate {
+                    FilterChip(label: "Başlangıç: \(startDate.displayString)") {
+                        useStartDate = false
+                    }
+                }
+
+                if useEndDate {
+                    FilterChip(label: "Bitiş: \(endDate.displayString)") {
+                        useEndDate = false
+                    }
+                }
+
+                Button("Temizle") {
+                    clearFilters()
+                }
+                .font(.caption.weight(.semibold))
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
+    }
+
+    private func clearFilters() {
+        selectedCategoryId = nil
+        selectedVisibilityScope = nil
+        useStartDate = false
+        useEndDate = false
+        searchText = ""
+    }
+
+    private func normalizeCategoryFilter(
+        selectedType: TransactionType?,
+        resetIfMissing: Bool = false
+    ) {
+        selectedCategoryId = TransactionFilterSupport.normalizedCategorySelection(
+            selectedCategoryId: selectedCategoryId,
+            categories: categoryVM.categories,
+            selectedType: selectedType,
+            resetIfMissing: resetIfMissing
+        )
     }
 }
 
@@ -234,6 +362,138 @@ struct TransactionRowView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(category?.name ?? String(localized: "Kategori Yok")), \(transaction.type == .income ? String(localized: "gelir") : String(localized: "gider")), \(transaction.amount.formatted())")
+    }
+}
+
+struct TransactionFilterSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var categoryVM: CategoryViewModel
+    let selectedType: TransactionType?
+
+    @Binding var selectedCategoryId: UUID?
+    @Binding var selectedVisibilityScope: VisibilityScope?
+    @Binding var useStartDate: Bool
+    @Binding var startDate: Date
+    @Binding var useEndDate: Bool
+    @Binding var endDate: Date
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Kategori") {
+                    Picker("Kategori", selection: $selectedCategoryId) {
+                        Text("Tümü").tag(UUID?.none)
+                        ForEach(
+                            TransactionFilterSupport.availableCategories(
+                                categories: categoryVM.categories,
+                                selectedType: selectedType
+                            )
+                        ) { category in
+                            Text(category.name).tag(UUID?.some(category.id))
+                        }
+                    }
+                }
+
+                Section("Kapsam") {
+                    Picker("Görünürlük", selection: $selectedVisibilityScope) {
+                        Text("Tümü").tag(VisibilityScope?.none)
+                        Text("Kişisel").tag(VisibilityScope?.some(.personal))
+                        Text("Ortak").tag(VisibilityScope?.some(.shared))
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section("Tarih Aralığı") {
+                    Toggle("Başlangıç Tarihi", isOn: $useStartDate)
+                    if useStartDate {
+                        DatePicker("Başlangıç", selection: $startDate, displayedComponents: .date)
+                    }
+
+                    Toggle("Bitiş Tarihi", isOn: $useEndDate)
+                    if useEndDate {
+                        DatePicker("Bitiş", selection: $endDate, displayedComponents: .date)
+                    }
+                }
+            }
+            .navigationTitle("Filtreler")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Kapat") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Sıfırla") {
+                        selectedCategoryId = nil
+                        selectedVisibilityScope = nil
+                        useStartDate = false
+                        useEndDate = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum TransactionFilterSupport {
+    static func availableCategories(
+        categories: [Category],
+        selectedType: TransactionType?
+    ) -> [Category] {
+        guard let selectedType else { return categories }
+        return categories.filter { $0.type.rawValue == selectedType.rawValue }
+    }
+
+    static func normalizedCategorySelection(
+        selectedCategoryId: UUID?,
+        categories: [Category],
+        selectedType: TransactionType?,
+        resetIfMissing: Bool
+    ) -> UUID? {
+        guard let selectedCategoryId else { return nil }
+
+        let availableCategoryIds = Set(
+            availableCategories(
+                categories: categories,
+                selectedType: selectedType
+            ).map(\.id)
+        )
+
+        if resetIfMissing || !availableCategoryIds.contains(selectedCategoryId) {
+            return nil
+        }
+
+        return selectedCategoryId
+    }
+
+    static func isFilterResultEmpty(
+        hasTransactions: Bool,
+        hasActiveFilters: Bool,
+        searchText: String
+    ) -> Bool {
+        hasTransactions && (hasActiveFilters || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+}
+
+struct FilterChip: View {
+    let label: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.caption)
+            Button {
+                onRemove()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.systemGray6))
+        .clipShape(Capsule())
     }
 }
 

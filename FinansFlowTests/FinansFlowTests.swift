@@ -138,6 +138,154 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertTrue(summary.hasAnyData)
         XCTAssertEqual(summary.deltaText, "Son snapshot ile aynı seviyede")
     }
+
+    func testFilteredTransactionsSupportsCategoryVisibilityAndDateRange() {
+        let workspaceId = UUID()
+        let categoryId = UUID()
+        let secondCategoryId = UUID()
+        let userId = UUID()
+        let viewModel = TransactionViewModel()
+        viewModel.transactions = [
+            Transaction(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: userId,
+                type: .expense,
+                categoryId: categoryId,
+                amount: 100,
+                currency: "TRY",
+                date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 10))!,
+                description: "Market",
+                paymentMethod: "Nakit",
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            Transaction(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: userId,
+                type: .expense,
+                categoryId: secondCategoryId,
+                amount: 250,
+                currency: "TRY",
+                date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 15))!,
+                description: "Kira",
+                paymentMethod: "Havale/EFT",
+                visibilityScope: .personal,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        let filtered = viewModel.filteredTransactions(
+            type: .expense,
+            categoryId: categoryId,
+            visibilityScope: .shared,
+            startDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 1))!,
+            endDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 12))!
+        )
+
+        XCTAssertEqual(filtered.count, 1)
+        XCTAssertEqual(filtered.first?.description, "Market")
+    }
+
+    func testTransactionFilterSupportScopesCategoriesBySelectedType() {
+        let incomeCategory = Category(
+            id: UUID(),
+            workspaceId: UUID(),
+            name: "Maas",
+            type: .income,
+            parentId: nil,
+            color: "#00FF00",
+            icon: "banknote",
+            monthlyBudget: nil,
+            isDefault: false,
+            createdAt: nil
+        )
+        let expenseCategory = Category(
+            id: UUID(),
+            workspaceId: UUID(),
+            name: "Market",
+            type: .expense,
+            parentId: nil,
+            color: "#FF0000",
+            icon: "cart",
+            monthlyBudget: nil,
+            isDefault: false,
+            createdAt: nil
+        )
+
+        let filtered = TransactionFilterSupport.availableCategories(
+            categories: [incomeCategory, expenseCategory],
+            selectedType: TransactionType.income
+        )
+
+        XCTAssertEqual(filtered.count, 1)
+        XCTAssertEqual(filtered.map { $0.id }, [incomeCategory.id])
+    }
+
+    func testTransactionFilterSupportDetectsFilteredEmptyState() {
+        XCTAssertTrue(
+            TransactionFilterSupport.isFilterResultEmpty(
+                hasTransactions: true,
+                hasActiveFilters: true,
+                searchText: ""
+            )
+        )
+        XCTAssertTrue(
+            TransactionFilterSupport.isFilterResultEmpty(
+                hasTransactions: true,
+                hasActiveFilters: false,
+                searchText: "market"
+            )
+        )
+        XCTAssertFalse(
+            TransactionFilterSupport.isFilterResultEmpty(
+                hasTransactions: false,
+                hasActiveFilters: true,
+                searchText: ""
+            )
+        )
+    }
+
+    func testTransactionFilterSupportClearsMissingCategorySelection() {
+        let categoryId = UUID()
+        let keptSelection = TransactionFilterSupport.normalizedCategorySelection(
+            selectedCategoryId: categoryId,
+            categories: [
+                Category(
+                    id: categoryId,
+                    workspaceId: UUID(),
+                    name: "Market",
+                    type: .expense,
+                    parentId: nil,
+                    color: "#FF0000",
+                    icon: "cart",
+                    monthlyBudget: nil,
+                    isDefault: false,
+                    createdAt: nil
+                )
+            ],
+            selectedType: .expense,
+            resetIfMissing: false
+        )
+        let clearedSelection = TransactionFilterSupport.normalizedCategorySelection(
+            selectedCategoryId: categoryId,
+            categories: [],
+            selectedType: .expense,
+            resetIfMissing: true
+        )
+
+        XCTAssertEqual(keptSelection, categoryId)
+        XCTAssertNil(clearedSelection)
+    }
 }
 
 private actor CallRecorder {
