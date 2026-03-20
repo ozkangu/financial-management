@@ -9,11 +9,11 @@ final class InvestmentViewModel {
     private let service = SupabaseService.shared
 
     var totalPortfolioValue: Double {
-        investments.reduce(0) { $0 + $1.currentValue }
+        investments.reduce(0) { sum, investment in sum + investment.currentValue }
     }
 
     var totalCost: Double {
-        investments.reduce(0) { $0 + $1.totalCost }
+        investments.reduce(0) { sum, investment in sum + investment.totalCost }
     }
 
     var totalProfitLoss: Double {
@@ -26,14 +26,14 @@ final class InvestmentViewModel {
     }
 
     var distributionByType: [(type: InvestmentType, value: Double, percentage: Double)] {
-        let grouped = Dictionary(grouping: investments) { $0.type }
+        let grouped = Dictionary(grouping: investments) { investment in investment.type }
         let total = totalPortfolioValue
         guard total > 0 else { return [] }
-        return grouped.map { (type, items) in
-            let value = items.reduce(0.0) { $0 + $1.currentValue }
-            return (type: type, value: value, percentage: (value / total) * 100)
+        return grouped.map { investmentType, investmentItems in
+            let value = investmentItems.reduce(0.0) { sum, investment in sum + investment.currentValue }
+            return (type: investmentType, value: value, percentage: (value / total) * 100)
         }
-        .sorted { $0.value > $1.value }
+        .sorted { firstDistribution, secondDistribution in firstDistribution.value > secondDistribution.value }
     }
 
     func loadInvestments(workspaceId: UUID) async {
@@ -87,7 +87,7 @@ final class InvestmentViewModel {
             user_id: userId.uuidString,
             name: name,
             type: type.rawValue,
-            purchase_date: purchaseDate.map { dateFormatter.string(from: $0) },
+            purchase_date: purchaseDate.map { date in dateFormatter.string(from: date) },
             unit_cost: unitCost,
             quantity: quantity,
             current_value: currentValue,
@@ -125,13 +125,13 @@ final class InvestmentViewModel {
             )
         )
 
-        if let idx = investments.firstIndex(where: { $0.id == investment.id }) {
-            investments[idx] = investment
+        if let index = investments.firstIndex(where: { existingInvestment in existingInvestment.id == investment.id }) {
+            investments[index] = investment
         }
     }
 
     func deleteInvestment(_ investment: Investment) async throws {
         try await service.delete(from: "investments", id: investment.id)
-        investments.removeAll { $0.id == investment.id }
+        investments.removeAll { existingInvestment in existingInvestment.id == investment.id }
     }
 }

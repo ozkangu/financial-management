@@ -52,8 +52,8 @@ struct CategoryFormView: View {
                         }
                     }
 
-                    let parents = viewModel.categories.filter {
-                        $0.type == type && $0.parentId == nil && $0.id != editingCategory?.id
+                    let parents = viewModel.categories.filter { category in
+                        category.type == type && category.parentId == nil && category.id != editingCategory?.id
                     }
                     if !parents.isEmpty {
                         Picker("Üst Kategori", selection: $parentId) {
@@ -131,16 +131,16 @@ struct CategoryFormView: View {
     }
 
     private func loadExisting() {
-        guard let cat = editingCategory else {
+        guard let existingCategory = editingCategory else {
             type = categoryType
             return
         }
-        name = cat.name
-        type = cat.type
-        parentId = cat.parentId
-        color = cat.color
-        icon = cat.icon
-        monthlyBudget = cat.monthlyBudget.map { String($0) } ?? ""
+        name = existingCategory.name
+        type = existingCategory.type
+        parentId = existingCategory.parentId
+        color = existingCategory.color
+        icon = existingCategory.icon
+        monthlyBudget = existingCategory.monthlyBudget.map { String($0) } ?? ""
     }
 
     private func save() async {

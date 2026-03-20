@@ -9,11 +9,11 @@ final class LiabilityViewModel {
     private let service = SupabaseService.shared
 
     var totalDebt: Double {
-        liabilities.reduce(0) { $0 + $1.remainingAmount }
+        liabilities.reduce(0) { sum, liability in sum + liability.remainingAmount }
     }
 
     var totalMonthlyPayment: Double {
-        liabilities.reduce(0) { $0 + ($1.monthlyPayment ?? 0) }
+        liabilities.reduce(0) { sum, liability in sum + (liability.monthlyPayment ?? 0) }
     }
 
     func loadLiabilities(workspaceId: UUID) async {
@@ -72,7 +72,7 @@ final class LiabilityViewModel {
             interest_rate: interestRate,
             monthly_payment: monthlyPayment,
             currency: currency,
-            due_date: dueDate.map { dateFormatter.string(from: $0) },
+            due_date: dueDate.map { date in dateFormatter.string(from: date) },
             notes: notes
         )
 
@@ -105,18 +105,18 @@ final class LiabilityViewModel {
                 remaining_amount: liability.remainingAmount,
                 interest_rate: liability.interestRate,
                 monthly_payment: liability.monthlyPayment,
-                due_date: liability.dueDate.map { dateFormatter.string(from: $0) },
+                due_date: liability.dueDate.map { date in dateFormatter.string(from: date) },
                 notes: liability.notes
             )
         )
 
-        if let idx = liabilities.firstIndex(where: { $0.id == liability.id }) {
-            liabilities[idx] = liability
+        if let index = liabilities.firstIndex(where: { existingLiability in existingLiability.id == liability.id }) {
+            liabilities[index] = liability
         }
     }
 
     func deleteLiability(_ liability: Liability) async throws {
         try await service.delete(from: "liabilities", id: liability.id)
-        liabilities.removeAll { $0.id == liability.id }
+        liabilities.removeAll { existingLiability in existingLiability.id == liability.id }
     }
 }

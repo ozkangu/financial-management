@@ -52,7 +52,9 @@ struct PassiveIncomeListView: View {
                     ForEach(viewModel.passiveIncomes) { income in
                         PassiveIncomeRowView(
                             income: income,
-                            investmentName: investmentVM.investments.first { $0.id == income.investmentId }?.name
+                            investmentName: investmentVM.investments.first { investment in
+                                investment.id == income.investmentId
+                            }?.name
                         )
                         .onTapGesture {
                             HapticManager.selection()

@@ -10,18 +10,18 @@ final class NetWorthViewModel {
     private let service = SupabaseService.shared
 
     var totalAssets: Double {
-        assets.reduce(0) { $0 + $1.value }
+        assets.reduce(0) { sum, asset in sum + asset.value }
     }
 
     var assetDistribution: [(type: AssetType, value: Double, percentage: Double)] {
-        let grouped = Dictionary(grouping: assets) { $0.type }
+        let grouped = Dictionary(grouping: assets) { asset in asset.type }
         let total = totalAssets
         guard total > 0 else { return [] }
-        return grouped.map { (type, items) in
-            let value = items.reduce(0.0) { $0 + $1.value }
-            return (type: type, value: value, percentage: (value / total) * 100)
+        return grouped.map { assetType, assetItems in
+            let value = assetItems.reduce(0.0) { sum, asset in sum + asset.value }
+            return (type: assetType, value: value, percentage: (value / total) * 100)
         }
-        .sorted { $0.value > $1.value }
+        .sorted { firstDistribution, secondDistribution in firstDistribution.value > secondDistribution.value }
     }
 
     func loadAssets(workspaceId: UUID) async {
@@ -106,14 +106,14 @@ final class NetWorthViewModel {
             )
         )
 
-        if let idx = assets.firstIndex(where: { $0.id == asset.id }) {
-            assets[idx] = asset
+        if let index = assets.firstIndex(where: { existingAsset in existingAsset.id == asset.id }) {
+            assets[index] = asset
         }
     }
 
     func deleteAsset(_ asset: Asset) async throws {
         try await service.delete(from: "assets", id: asset.id)
-        assets.removeAll { $0.id == asset.id }
+        assets.removeAll { existingAsset in existingAsset.id == asset.id }
     }
 
     func createSnapshot(workspaceId: UUID, totalLiabilities: Double) async throws {

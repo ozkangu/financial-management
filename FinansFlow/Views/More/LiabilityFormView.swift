@@ -85,18 +85,18 @@ struct LiabilityFormView: View {
     }
 
     private func loadExisting() {
-        guard let l = editingLiability else { return }
-        name = l.name
-        type = l.type
-        totalAmount = String(l.totalAmount)
-        remainingAmount = String(l.remainingAmount)
-        interestRate = l.interestRate.map { String($0) } ?? ""
-        monthlyPayment = l.monthlyPayment.map { String($0) } ?? ""
-        if let d = l.dueDate {
-            dueDate = d
+        guard let existingLiability = editingLiability else { return }
+        name = existingLiability.name
+        type = existingLiability.type
+        totalAmount = String(existingLiability.totalAmount)
+        remainingAmount = String(existingLiability.remainingAmount)
+        interestRate = existingLiability.interestRate.map { String($0) } ?? ""
+        monthlyPayment = existingLiability.monthlyPayment.map { String($0) } ?? ""
+        if let dueDateValue = existingLiability.dueDate {
+            dueDate = dueDateValue
             hasDueDate = true
         }
-        notes = l.notes ?? ""
+        notes = existingLiability.notes ?? ""
     }
 
     private func save() async {

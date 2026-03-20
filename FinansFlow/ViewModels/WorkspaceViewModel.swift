@@ -100,14 +100,14 @@ final class WorkspaceViewModel {
             id: workspace.id,
             value: UpdatePayload(name: workspace.name)
         )
-        if let idx = workspaces.firstIndex(where: { $0.id == workspace.id }) {
-            workspaces[idx] = workspace
+        if let index = workspaces.firstIndex(where: { existingWorkspace in existingWorkspace.id == workspace.id }) {
+            workspaces[index] = workspace
         }
     }
 
     func deleteWorkspace(_ workspace: Workspace) async throws {
         try await service.delete(from: "workspaces", id: workspace.id)
-        workspaces.removeAll { $0.id == workspace.id }
+        workspaces.removeAll { existingWorkspace in existingWorkspace.id == workspace.id }
         if activeWorkspace?.id == workspace.id {
             activeWorkspace = workspaces.first
         }
@@ -116,11 +116,11 @@ final class WorkspaceViewModel {
     // MARK: - Members
 
     func loadMembers() async {
-        guard let ws = activeWorkspace else { return }
+        guard let activeWorkspaceData = activeWorkspace else { return }
         do {
             members = try await service.fetchAll(
                 from: "workspace_members",
-                filters: [("workspace_id", ws.id.uuidString)]
+                filters: [("workspace_id", activeWorkspaceData.id.uuidString)]
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -161,7 +161,7 @@ final class WorkspaceViewModel {
 
     func removeMember(memberId: UUID) async throws {
         try await service.delete(from: "workspace_members", id: memberId)
-        members.removeAll { $0.id == memberId }
+        members.removeAll { existingMember in existingMember.id == memberId }
     }
 
     // MARK: - Category Seeding

@@ -53,28 +53,28 @@ struct TransactionListView: View {
                     }
                 } else {
                     List {
-                        let grouped = Dictionary(grouping: filtered) { $0.date.displayString }
-                        let sortedDates = grouped.keys.sorted { key1, key2 in
-                            let txs1 = grouped[key1]!
-                            let txs2 = grouped[key2]!
-                            return (txs1.first?.date ?? Date()) > (txs2.first?.date ?? Date())
+                        let grouped = Dictionary(grouping: filtered) { transaction in transaction.date.displayString }
+                        let sortedDates = grouped.keys.sorted { firstDateKey, secondDateKey in
+                            let firstTransactions = grouped[firstDateKey]!
+                            let secondTransactions = grouped[secondDateKey]!
+                            return (firstTransactions.first?.date ?? Date()) > (secondTransactions.first?.date ?? Date())
                         }
 
                         ForEach(sortedDates, id: \.self) { dateStr in
                             Section(dateStr) {
-                                ForEach(grouped[dateStr] ?? []) { tx in
+                                ForEach(grouped[dateStr] ?? []) { transaction in
                                     TransactionRowView(
-                                        transaction: tx,
-                                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                                        transaction: transaction,
+                                        category: categoryVM.categories.first { existingCategory in existingCategory.id == transaction.categoryId }
                                     )
                                     .onTapGesture {
                                         HapticManager.selection()
-                                        editingTransaction = tx
+                                        editingTransaction = transaction
                                     }
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
                                             Task {
-                                                try? await transactionVM.deleteTransaction(tx)
+                                                try? await transactionVM.deleteTransaction(transaction)
                                                 HapticManager.notification(.success)
                                             }
                                         } label: {
@@ -82,7 +82,7 @@ struct TransactionListView: View {
                                         }
 
                                         Button {
-                                            editingTransaction = tx
+                                            editingTransaction = transaction
                                         } label: {
                                             Label("Düzenle", systemImage: "pencil")
                                         }
@@ -134,12 +134,12 @@ struct TransactionListView: View {
                     transactionType: .expense
                 )
             }
-            .sheet(item: $editingTransaction) { tx in
+            .sheet(item: $editingTransaction) { transaction in
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
                     workspaceId: workspaceId,
-                    editingTransaction: tx
+                    editingTransaction: transaction
                 )
             }
         }
