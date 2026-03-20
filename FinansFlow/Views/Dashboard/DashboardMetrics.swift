@@ -52,6 +52,12 @@ struct DashboardPassiveIncomeSummary: Equatable {
     }
 }
 
+struct DashboardInsightItem: Equatable, Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
 enum DashboardMetrics {
     static func netWorthSummary(
         assets: [Asset],
@@ -96,5 +102,160 @@ enum DashboardMetrics {
             nextPaymentDate: nextIncome?.nextPaymentDate,
             nextPaymentDescription: nextIncome?.description ?? nextIncome?.type.displayName
         )
+    }
+
+    static func insights(
+        transactions: [Transaction],
+        categories: [Category],
+        liabilities: [Liability],
+        referenceDate: Date
+    ) -> [DashboardInsightItem] {
+        [
+            topExpenseCategoryInsight(
+                transactions: transactions,
+                categories: categories,
+                referenceDate: referenceDate
+            ),
+            monthlyChangeInsight(
+                transactions: transactions,
+                referenceDate: referenceDate
+            ),
+            debtPressureInsight(
+                transactions: transactions,
+                liabilities: liabilities,
+                referenceDate: referenceDate
+            )
+        ]
+        .compactMap { $0 }
+    }
+
+    private static func topExpenseCategoryInsight(
+        transactions: [Transaction],
+        categories: [Category],
+        referenceDate: Date
+    ) -> DashboardInsightItem? {
+        let currentMonthExpenses = transactions.filter {
+            $0.type == .expense &&
+            $0.date >= referenceDate.startOfMonth &&
+            $0.date <= referenceDate.endOfMonth
+        }
+
+        let grouped = Dictionary(grouping: currentMonthExpenses) { $0.categoryId }
+        guard
+            let topCategoryGroup = grouped.max(by: {
+                $0.value.reduce(0) { $0 + $1.amount } < $1.value.reduce(0) { $0 + $1.amount }
+            })
+        else {
+            return DashboardInsightItem(
+                title: "Harcama Dagilimi",
+                message: "Bu ay kategori bazli gider verisi henuz olusmadi."
+            )
+        }
+
+        let totalAmount = topCategoryGroup.value.reduce(0) { $0 + $1.amount }
+        let categoryName = topCategoryGroup.key.flatMap { categoryId in
+            categories.first(where: { $0.id == categoryId })?.name
+        } ?? "Diger"
+
+        return DashboardInsightItem(
+            title: "En Yuksek Gider",
+            message: "Bu ay en cok harcama \(categoryName) kategorisinde: \(totalAmount.formatted())."
+        )
+    }
+
+    private static func monthlyChangeInsight(
+        transactions: [Transaction],
+        referenceDate: Date
+    ) -> DashboardInsightItem {
+        let currentMonth = monthSummary(for: referenceDate, transactions: transactions)
+        let previousMonth = monthSummary(for: referenceDate.monthsAgo(1), transactions: transactions)
+
+        let incomeDelta = currentMonth.income - previousMonth.income
+        let expenseDelta = currentMonth.expense - previousMonth.expense
+
+        if previousMonth.income == 0 && previousMonth.expense == 0 {
+            return DashboardInsightItem(
+                title: "Aylik Karsilastirma",
+                message: "Gecen ay veri olmadigi icin degisim orani henuz hesaplanamiyor."
+            )
+        }
+
+        let incomeText = changeText(
+            label: "gelir",
+            amount: incomeDelta
+        )
+        let expenseText = changeText(
+            label: "gider",
+            amount: expenseDelta
+        )
+
+        return DashboardInsightItem(
+            title: "Aylik Degisim",
+            message: "Gecen aya gore \(incomeText), \(expenseText)."
+        )
+    }
+
+    private static func debtPressureInsight(
+        transactions: [Transaction],
+        liabilities: [Liability],
+        referenceDate: Date
+    ) -> DashboardInsightItem {
+        let currentIncome = transactions
+            .filter { $0.type == .income && $0.date >= referenceDate.startOfMonth && $0.date <= referenceDate.endOfMonth }
+            .reduce(0) { $0 + $1.amount }
+        let currentExpense = transactions
+            .filter { $0.type == .expense && $0.date >= referenceDate.startOfMonth && $0.date <= referenceDate.endOfMonth }
+            .reduce(0) { $0 + $1.amount }
+        let totalMonthlyDebt = liabilities.reduce(0) { $0 + ($1.monthlyPayment ?? 0) }
+        let netCashFlow = currentIncome - currentExpense
+
+        if totalMonthlyDebt > 0 && currentIncome > 0 && (totalMonthlyDebt / currentIncome) >= 0.4 {
+            return DashboardInsightItem(
+                title: "Borc Baskisi",
+                message: "Aylik borc odemeleri gelirin \(Int((totalMonthlyDebt / currentIncome) * 100))% seviyesinde. Nakit akisini yakindan izleyin."
+            )
+        }
+
+        if netCashFlow > 0 {
+            return DashboardInsightItem(
+                title: "Nakit Akisi",
+                message: "Bu ay pozitif nakit akisi var. Net fark \(netCashFlow.formatted())."
+            )
+        }
+
+        if netCashFlow < 0 {
+            return DashboardInsightItem(
+                title: "Nakit Akisi",
+                message: "Bu ay giderler geliri asti. Net acik \(abs(netCashFlow).formatted())."
+            )
+        }
+
+        return DashboardInsightItem(
+            title: "Nakit Dengesi",
+            message: "Bu ay gelir ve gider dengesi basa bas seviyede."
+        )
+    }
+
+    private static func monthSummary(
+        for month: Date,
+        transactions: [Transaction]
+    ) -> (income: Double, expense: Double) {
+        let income = transactions
+            .filter { $0.type == .income && $0.date >= month.startOfMonth && $0.date <= month.endOfMonth }
+            .reduce(0) { $0 + $1.amount }
+        let expense = transactions
+            .filter { $0.type == .expense && $0.date >= month.startOfMonth && $0.date <= month.endOfMonth }
+            .reduce(0) { $0 + $1.amount }
+
+        return (income, expense)
+    }
+
+    private static func changeText(label: String, amount: Double) -> String {
+        if amount == 0 {
+            return "\(label) ayni seviyede"
+        }
+
+        let direction = amount > 0 ? "artti" : "azaldi"
+        return "\(label) \(abs(amount).formatted()) kadar \(direction)"
     }
 }

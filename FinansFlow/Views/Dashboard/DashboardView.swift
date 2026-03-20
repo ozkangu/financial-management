@@ -44,6 +44,15 @@ struct DashboardView: View {
         )
     }
 
+    private var insights: [DashboardInsightItem] {
+        DashboardMetrics.insights(
+            transactions: transactionVM.transactions,
+            categories: categoryVM.categories,
+            liabilities: liabilityVM.liabilities,
+            referenceDate: now
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -66,6 +75,8 @@ struct DashboardView: View {
                         upcomingPaymentsCard
                     }
                     .padding(.horizontal)
+
+                    insightsSection
 
                     // Recent Transactions
                     recentTransactionsSection
@@ -391,6 +402,34 @@ struct DashboardView: View {
     }
 
     // MARK: - Recent Transactions
+
+    private var insightsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ICGORULER")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(insights) { insight in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(insight.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(insight.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                }
+
+                if insight.id != insights.last?.id {
+                    Divider()
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .padding(.horizontal)
+    }
 
     private var recentTransactionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {

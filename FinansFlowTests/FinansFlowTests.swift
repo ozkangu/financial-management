@@ -198,6 +198,175 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertFalse(summary.hasAnyData)
     }
 
+    func testDashboardInsightsGenerateTopExpenseMonthlyChangeAndDebtPressure() {
+        let calendar = Calendar.current
+        let now = calendar.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+        let foodCategoryId = UUID()
+        let rentCategoryId = UUID()
+        let categories = [
+            Category(
+                id: foodCategoryId,
+                workspaceId: UUID(),
+                name: "Market",
+                type: .expense,
+                parentId: nil,
+                color: "#FF0000",
+                icon: "cart",
+                monthlyBudget: nil,
+                isDefault: false,
+                createdAt: nil
+            ),
+            Category(
+                id: rentCategoryId,
+                workspaceId: UUID(),
+                name: "Kira",
+                type: .expense,
+                parentId: nil,
+                color: "#00FF00",
+                icon: "house",
+                monthlyBudget: nil,
+                isDefault: false,
+                createdAt: nil
+            )
+        ]
+        let transactions = [
+            Transaction(
+                id: UUID(),
+                workspaceId: UUID(),
+                userId: UUID(),
+                type: .income,
+                categoryId: nil,
+                amount: 10_000,
+                currency: "TRY",
+                date: calendar.date(from: DateComponents(year: 2026, month: 3, day: 5))!,
+                description: "Maas",
+                paymentMethod: nil,
+                visibilityScope: .personal,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            Transaction(
+                id: UUID(),
+                workspaceId: UUID(),
+                userId: UUID(),
+                type: .expense,
+                categoryId: foodCategoryId,
+                amount: 2_500,
+                currency: "TRY",
+                date: calendar.date(from: DateComponents(year: 2026, month: 3, day: 7))!,
+                description: "Market",
+                paymentMethod: nil,
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            Transaction(
+                id: UUID(),
+                workspaceId: UUID(),
+                userId: UUID(),
+                type: .expense,
+                categoryId: rentCategoryId,
+                amount: 1_500,
+                currency: "TRY",
+                date: calendar.date(from: DateComponents(year: 2026, month: 3, day: 2))!,
+                description: "Kira",
+                paymentMethod: nil,
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            Transaction(
+                id: UUID(),
+                workspaceId: UUID(),
+                userId: UUID(),
+                type: .income,
+                categoryId: nil,
+                amount: 8_000,
+                currency: "TRY",
+                date: calendar.date(from: DateComponents(year: 2026, month: 2, day: 5))!,
+                description: "Subat Maas",
+                paymentMethod: nil,
+                visibilityScope: .personal,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            Transaction(
+                id: UUID(),
+                workspaceId: UUID(),
+                userId: UUID(),
+                type: .expense,
+                categoryId: rentCategoryId,
+                amount: 2_000,
+                currency: "TRY",
+                date: calendar.date(from: DateComponents(year: 2026, month: 2, day: 11))!,
+                description: "Subat Kira",
+                paymentMethod: nil,
+                visibilityScope: .shared,
+                isRecurring: false,
+                recurrenceInterval: nil,
+                tags: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+        let liabilities = [
+            Liability(
+                id: UUID(),
+                workspaceId: UUID(),
+                userId: UUID(),
+                name: "Kredi Karti",
+                type: .creditCard,
+                totalAmount: 50_000,
+                remainingAmount: 30_000,
+                interestRate: nil,
+                monthlyPayment: 4_500,
+                currency: "TRY",
+                dueDate: nil,
+                notes: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        let insights = DashboardMetrics.insights(
+            transactions: transactions,
+            categories: categories,
+            liabilities: liabilities,
+            referenceDate: now
+        )
+
+        XCTAssertEqual(insights.count, 3)
+        XCTAssertTrue(insights.contains(where: { $0.title == "En Yuksek Gider" && $0.message.contains("Market") }))
+        XCTAssertTrue(insights.contains(where: { $0.title == "Aylik Degisim" && $0.message.contains("gelir") }))
+        XCTAssertTrue(insights.contains(where: { $0.title == "Borc Baskisi" }))
+    }
+
+    func testDashboardInsightsProvideFallbacksWithoutData() {
+        let insights = DashboardMetrics.insights(
+            transactions: [],
+            categories: [],
+            liabilities: [],
+            referenceDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!
+        )
+
+        XCTAssertEqual(insights.count, 3)
+        XCTAssertTrue(insights.contains(where: { $0.message.contains("henuz olusmadi") }))
+        XCTAssertTrue(insights.contains(where: { $0.message.contains("henuz hesaplanamiyor") }))
+        XCTAssertTrue(insights.contains(where: { $0.message.contains("basa bas") }))
+    }
+
     func testFilteredTransactionsSupportsCategoryVisibilityAndDateRange() {
         let workspaceId = UUID()
         let categoryId = UUID()
