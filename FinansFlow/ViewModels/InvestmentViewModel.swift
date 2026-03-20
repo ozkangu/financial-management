@@ -7,6 +7,7 @@ final class InvestmentViewModel {
     var errorMessage: String?
 
     private let service = SupabaseService.shared
+    private var latestWorkspaceId: UUID?
 
     var totalPortfolioValue: Double {
         investments.reduce(0) { $0 + $1.currentValue }
@@ -37,17 +38,25 @@ final class InvestmentViewModel {
     }
 
     func loadInvestments(workspaceId: UUID) async {
+        latestWorkspaceId = workspaceId
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if latestWorkspaceId == workspaceId {
+                isLoading = false
+            }
+        }
 
         do {
-            investments = try await service.fetchAll(
+            let fetched: [Investment] = try await service.fetchAll(
                 from: "investments",
                 filters: [("workspace_id", workspaceId.uuidString)],
                 orderBy: "created_at",
                 ascending: false
             )
+            guard latestWorkspaceId == workspaceId else { return }
+            investments = fetched
         } catch {
+            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }

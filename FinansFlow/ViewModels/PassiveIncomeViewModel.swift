@@ -7,6 +7,7 @@ final class PassiveIncomeViewModel {
     var errorMessage: String?
 
     private let service = SupabaseService.shared
+    private var latestWorkspaceId: UUID?
 
     var totalMonthlyPassiveIncome: Double {
         passiveIncomes.reduce(0) { $0 + $1.monthlyAmount }
@@ -18,17 +19,25 @@ final class PassiveIncomeViewModel {
     }
 
     func loadPassiveIncomes(workspaceId: UUID) async {
+        latestWorkspaceId = workspaceId
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if latestWorkspaceId == workspaceId {
+                isLoading = false
+            }
+        }
 
         do {
-            passiveIncomes = try await service.fetchAll(
+            let fetched: [PassiveIncome] = try await service.fetchAll(
                 from: "passive_incomes",
                 filters: [("workspace_id", workspaceId.uuidString)],
                 orderBy: "created_at",
                 ascending: false
             )
+            guard latestWorkspaceId == workspaceId else { return }
+            passiveIncomes = fetched
         } catch {
+            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }

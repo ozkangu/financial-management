@@ -14,6 +14,32 @@ struct ContentView: View {
         workspaceVM.activeWorkspace?.id ?? UUID()
     }
 
+    private var workspaceDataLoader: WorkspaceDataLoader {
+        WorkspaceDataLoader(
+            loadCategories: { workspaceId in
+                await categoryVM.loadCategories(workspaceId: workspaceId)
+            },
+            loadTransactions: { workspaceId in
+                await transactionVM.loadTransactions(workspaceId: workspaceId, reset: true)
+            },
+            loadInvestments: { workspaceId in
+                await investmentVM.loadInvestments(workspaceId: workspaceId)
+            },
+            loadPassiveIncomes: { workspaceId in
+                await passiveIncomeVM.loadPassiveIncomes(workspaceId: workspaceId)
+            },
+            loadLiabilities: { workspaceId in
+                await liabilityVM.loadLiabilities(workspaceId: workspaceId)
+            },
+            loadAssets: { workspaceId in
+                await netWorthVM.loadAssets(workspaceId: workspaceId)
+            },
+            loadSnapshots: { workspaceId in
+                await netWorthVM.loadSnapshots(workspaceId: workspaceId)
+            }
+        )
+    }
+
     var body: some View {
         TabView {
             DashboardView(
@@ -68,15 +94,10 @@ struct ContentView: View {
             guard let userId = authService.currentUser?.id,
                   let name = authService.currentUser?.name else { return }
             await workspaceVM.ensurePersonalWorkspace(userId: userId, userName: name)
-            if let wsId = workspaceVM.activeWorkspace?.id {
-                await categoryVM.loadCategories(workspaceId: wsId)
-                await transactionVM.loadTransactions(workspaceId: wsId, reset: true)
-                await investmentVM.loadInvestments(workspaceId: wsId)
-                await passiveIncomeVM.loadPassiveIncomes(workspaceId: wsId)
-                await liabilityVM.loadLiabilities(workspaceId: wsId)
-                await netWorthVM.loadAssets(workspaceId: wsId)
-                await netWorthVM.loadSnapshots(workspaceId: wsId)
-            }
+        }
+        .task(id: workspaceVM.activeWorkspace?.id) {
+            guard let workspaceId = workspaceVM.activeWorkspace?.id else { return }
+            await workspaceDataLoader.reload(workspaceId: workspaceId)
         }
     }
 }

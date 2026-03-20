@@ -7,6 +7,7 @@ final class CategoryViewModel {
     var errorMessage: String?
 
     private let service = SupabaseService.shared
+    private var latestWorkspaceId: UUID?
 
     var incomeCategories: [Category] {
         categories.filter { $0.type == .income && $0.parentId == nil }
@@ -21,17 +22,25 @@ final class CategoryViewModel {
     }
 
     func loadCategories(workspaceId: UUID) async {
+        latestWorkspaceId = workspaceId
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if latestWorkspaceId == workspaceId {
+                isLoading = false
+            }
+        }
 
         do {
-            categories = try await service.fetchAll(
+            let fetched: [Category] = try await service.fetchAll(
                 from: "categories",
                 filters: [("workspace_id", workspaceId.uuidString)],
                 orderBy: "name",
                 ascending: true
             )
+            guard latestWorkspaceId == workspaceId else { return }
+            categories = fetched
         } catch {
+            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }

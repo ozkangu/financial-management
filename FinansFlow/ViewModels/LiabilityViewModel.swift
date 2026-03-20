@@ -7,6 +7,7 @@ final class LiabilityViewModel {
     var errorMessage: String?
 
     private let service = SupabaseService.shared
+    private var latestWorkspaceId: UUID?
 
     var totalDebt: Double {
         liabilities.reduce(0) { $0 + $1.remainingAmount }
@@ -17,17 +18,25 @@ final class LiabilityViewModel {
     }
 
     func loadLiabilities(workspaceId: UUID) async {
+        latestWorkspaceId = workspaceId
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if latestWorkspaceId == workspaceId {
+                isLoading = false
+            }
+        }
 
         do {
-            liabilities = try await service.fetchAll(
+            let fetched: [Liability] = try await service.fetchAll(
                 from: "liabilities",
                 filters: [("workspace_id", workspaceId.uuidString)],
                 orderBy: "created_at",
                 ascending: false
             )
+            guard latestWorkspaceId == workspaceId else { return }
+            liabilities = fetched
         } catch {
+            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }

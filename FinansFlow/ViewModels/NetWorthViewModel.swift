@@ -8,6 +8,8 @@ final class NetWorthViewModel {
     var errorMessage: String?
 
     private let service = SupabaseService.shared
+    private var latestAssetsWorkspaceId: UUID?
+    private var latestSnapshotsWorkspaceId: UUID?
 
     var totalAssets: Double {
         assets.reduce(0) { $0 + $1.value }
@@ -25,30 +27,42 @@ final class NetWorthViewModel {
     }
 
     func loadAssets(workspaceId: UUID) async {
+        latestAssetsWorkspaceId = workspaceId
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if latestAssetsWorkspaceId == workspaceId {
+                isLoading = false
+            }
+        }
 
         do {
-            assets = try await service.fetchAll(
+            let fetched: [Asset] = try await service.fetchAll(
                 from: "assets",
                 filters: [("workspace_id", workspaceId.uuidString)],
                 orderBy: "created_at",
                 ascending: false
             )
+            guard latestAssetsWorkspaceId == workspaceId else { return }
+            assets = fetched
         } catch {
+            guard latestAssetsWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     func loadSnapshots(workspaceId: UUID) async {
+        latestSnapshotsWorkspaceId = workspaceId
         do {
-            snapshots = try await service.fetchAll(
+            let fetched: [NetWorthSnapshot] = try await service.fetchAll(
                 from: "net_worth_snapshots",
                 filters: [("workspace_id", workspaceId.uuidString)],
                 orderBy: "date",
                 ascending: true
             )
+            guard latestSnapshotsWorkspaceId == workspaceId else { return }
+            snapshots = fetched
         } catch {
+            guard latestSnapshotsWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }

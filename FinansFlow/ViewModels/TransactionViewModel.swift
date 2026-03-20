@@ -10,6 +10,7 @@ final class TransactionViewModel {
     private let service = SupabaseService.shared
     private var currentPage = 0
     private let pageSize = AppConstants.pageSize
+    private var latestWorkspaceId: UUID?
 
     // MARK: - Computed
 
@@ -54,6 +55,7 @@ final class TransactionViewModel {
     // MARK: - CRUD
 
     func loadTransactions(workspaceId: UUID, reset: Bool = false) async {
+        latestWorkspaceId = workspaceId
         if reset {
             currentPage = 0
             transactions = []
@@ -62,10 +64,13 @@ final class TransactionViewModel {
 
         guard hasMorePages else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if latestWorkspaceId == workspaceId {
+                isLoading = false
+            }
+        }
 
         do {
-            let offset = currentPage * pageSize
             let fetched: [Transaction] = try await service.fetchAll(
                 from: "transactions",
                 filters: [("workspace_id", workspaceId.uuidString)],
@@ -73,6 +78,7 @@ final class TransactionViewModel {
                 ascending: false,
                 limit: pageSize
             )
+            guard latestWorkspaceId == workspaceId else { return }
             if fetched.count < pageSize {
                 hasMorePages = false
             }
@@ -83,6 +89,7 @@ final class TransactionViewModel {
             }
             currentPage += 1
         } catch {
+            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
