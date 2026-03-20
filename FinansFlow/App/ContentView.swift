@@ -83,6 +83,7 @@ struct ContentView: View {
             MoreView(
                 workspaceVM: workspaceVM,
                 categoryVM: categoryVM,
+                transactionVM: transactionVM,
                 investmentVM: investmentVM,
                 passiveIncomeVM: passiveIncomeVM,
                 liabilityVM: liabilityVM

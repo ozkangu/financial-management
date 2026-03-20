@@ -345,6 +345,129 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertEqual(keptSelection, categoryId)
         XCTAssertNil(clearedSelection)
     }
+
+    func testCSVExportBuilderIncludesWorkspaceCategoryAndTransactionFields() {
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Aile Butcesi",
+            ownerId: UUID(),
+            createdAt: nil
+        )
+        let categoryId = UUID()
+        let category = Category(
+            id: categoryId,
+            workspaceId: workspace.id,
+            name: "Market",
+            type: .expense,
+            parentId: nil,
+            color: "#FF0000",
+            icon: "cart",
+            monthlyBudget: nil,
+            isDefault: false,
+            createdAt: nil
+        )
+        let transaction = Transaction(
+            id: UUID(),
+            workspaceId: workspace.id,
+            userId: UUID(),
+            type: .expense,
+            categoryId: categoryId,
+            amount: 450.75,
+            currency: "TRY",
+            date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 20))!,
+            description: "Haftalik market",
+            paymentMethod: nil,
+            visibilityScope: .shared,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+
+        let csv = CSVExportBuilder.transactionsCSV(
+            workspace: workspace,
+            transactions: [transaction],
+            categories: [category]
+        )
+
+        XCTAssertTrue(csv.contains("\"Workspace\",\"Tarih\",\"Tur\",\"Tutar\",\"Para Birimi\",\"Kategori\",\"Kapsam\",\"Aciklama\""))
+        XCTAssertTrue(csv.contains("\"Aile Butcesi\""))
+        XCTAssertTrue(csv.contains("\"Market\""))
+        XCTAssertTrue(csv.contains("\"Ortak\""))
+        XCTAssertTrue(csv.contains("\"Haftalik market\""))
+    }
+
+    func testCSVExportBuilderBuildsWorkspaceAwareFilename() {
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Benim Alanim",
+            ownerId: UUID(),
+            createdAt: nil
+        )
+
+        XCTAssertEqual(
+            CSVExportBuilder.filename(for: workspace),
+            "finansflow-benim-alanim-transactions.csv"
+        )
+        XCTAssertEqual(
+            CSVExportBuilder.filename(for: nil),
+            "finansflow-transactions.csv"
+        )
+    }
+
+    func testCSVExportBuilderEscapesQuotesCommasAndNewlines() {
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Is / Ev: Butcesi",
+            ownerId: UUID(),
+            createdAt: nil
+        )
+        let categoryId = UUID()
+        let category = Category(
+            id: categoryId,
+            workspaceId: workspace.id,
+            name: "Market, Manav",
+            type: .expense,
+            parentId: nil,
+            color: "#00AA00",
+            icon: "cart",
+            monthlyBudget: nil,
+            isDefault: false,
+            createdAt: nil
+        )
+        let transaction = Transaction(
+            id: UUID(),
+            workspaceId: workspace.id,
+            userId: UUID(),
+            type: .expense,
+            categoryId: categoryId,
+            amount: 99.9,
+            currency: "TRY",
+            date: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 21))!,
+            description: "Sebze \"indirim\"\n2 kalem",
+            paymentMethod: nil,
+            visibilityScope: .personal,
+            isRecurring: false,
+            recurrenceInterval: nil,
+            tags: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+
+        let csv = CSVExportBuilder.transactionsCSV(
+            workspace: workspace,
+            transactions: [transaction],
+            categories: [category]
+        )
+
+        XCTAssertTrue(csv.contains("\"Market, Manav\""))
+        XCTAssertTrue(csv.contains("\"Sebze \"\"indirim\"\"\n2 kalem\""))
+        XCTAssertEqual(
+            CSVExportBuilder.filename(for: workspace),
+            "finansflow-is-ev-butcesi-transactions.csv"
+        )
+    }
 }
 
 private actor CallRecorder {

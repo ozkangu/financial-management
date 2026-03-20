@@ -4,17 +4,20 @@ struct MoreView: View {
     @Environment(AuthService.self) private var authService
     @Bindable var workspaceVM: WorkspaceViewModel
     @Bindable var categoryVM: CategoryViewModel
+    @Bindable var transactionVM: TransactionViewModel
     @Bindable var investmentVM: InvestmentViewModel
     @Bindable var passiveIncomeVM: PassiveIncomeViewModel
     @Bindable var liabilityVM: LiabilityViewModel
 
     init(workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
          categoryVM: CategoryViewModel = CategoryViewModel(),
+         transactionVM: TransactionViewModel = TransactionViewModel(),
          investmentVM: InvestmentViewModel = InvestmentViewModel(),
          passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
          liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
         self.workspaceVM = workspaceVM
         self.categoryVM = categoryVM
+        self.transactionVM = transactionVM
         self.investmentVM = investmentVM
         self.passiveIncomeVM = passiveIncomeVM
         self.liabilityVM = liabilityVM
@@ -67,7 +70,11 @@ struct MoreView: View {
 
                 Section("Uygulama") {
                     NavigationLink {
-                        SettingsView()
+                        SettingsView(
+                            workspace: workspaceVM.activeWorkspace,
+                            transactionVM: transactionVM,
+                            categoryVM: categoryVM
+                        )
                     } label: {
                         Label("Ayarlar", systemImage: "gearshape.fill")
                     }
