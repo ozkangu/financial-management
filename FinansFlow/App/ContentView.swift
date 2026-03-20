@@ -3,27 +3,27 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         TabView {
-            Text("Dashboard")
+            DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "chart.bar.fill")
                 }
 
-            Text("Transactions")
+            TransactionListView()
                 .tabItem {
                     Label("İşlemler", systemImage: "arrow.left.arrow.right")
                 }
 
-            Text("Investments")
+            InvestmentListView()
                 .tabItem {
                     Label("Yatırımlar", systemImage: "chart.pie.fill")
                 }
 
-            Text("Net Worth")
+            NetWorthView()
                 .tabItem {
                     Label("Varlık", systemImage: "banknote.fill")
                 }
 
-            Text("More")
+            MoreView()
                 .tabItem {
                     Label("Daha Fazla", systemImage: "ellipsis.circle.fill")
                 }
