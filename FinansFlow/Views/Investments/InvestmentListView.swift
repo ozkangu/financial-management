@@ -1,30 +1,24 @@
 import SwiftUI
 import Charts
+import SwiftData
 
 struct InvestmentListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: InvestmentViewModel
-    let workspaceId: UUID
 
     @State private var showAddSheet = false
     @State private var editingInvestment: Investment?
 
-    init(viewModel: InvestmentViewModel = InvestmentViewModel(),
-         workspaceId: UUID = UUID()) {
+    init(viewModel: InvestmentViewModel = InvestmentViewModel()) {
         self.viewModel = viewModel
-        self.workspaceId = workspaceId
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Portfolio Summary
                     portfolioSummary
-
-                    // Distribution Chart
                     distributionChart
-
-                    // Investment List
                     investmentList
                 }
                 .padding(.vertical)
@@ -40,13 +34,10 @@ struct InvestmentListView: View {
                 }
             }
             .sheet(isPresented: $showAddSheet) {
-                InvestmentFormView(viewModel: viewModel, workspaceId: workspaceId)
+                InvestmentFormView(viewModel: viewModel)
             }
             .sheet(item: $editingInvestment) { inv in
-                InvestmentFormView(viewModel: viewModel, workspaceId: workspaceId, editingInvestment: inv)
-            }
-            .task {
-                await viewModel.loadInvestments(workspaceId: workspaceId)
+                InvestmentFormView(viewModel: viewModel, editingInvestment: inv)
             }
         }
     }
@@ -153,10 +144,8 @@ struct InvestmentListView: View {
                             }
                             .contextMenu {
                                 Button(role: .destructive) {
-                                    Task {
-                                        try? await viewModel.deleteInvestment(inv)
-                                        HapticManager.notification(.success)
-                                    }
+                                    viewModel.deleteInvestment(inv, context: modelContext)
+                                    HapticManager.notification(.success)
                                 } label: {
                                     Label("Sil", systemImage: "trash")
                                 }
@@ -216,4 +205,5 @@ struct InvestmentRowView: View {
 
 #Preview {
     InvestmentListView()
+        .modelContainer(for: [Investment.self, PassiveIncome.self], inMemory: true)
 }

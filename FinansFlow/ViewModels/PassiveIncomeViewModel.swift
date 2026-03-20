@@ -1,13 +1,11 @@
 import Foundation
+import SwiftData
 
 @Observable
 final class PassiveIncomeViewModel {
     var passiveIncomes: [PassiveIncome] = []
     var isLoading = false
     var errorMessage: String?
-
-    private let service = SupabaseService.shared
-    private var latestWorkspaceId: UUID?
 
     var totalMonthlyPassiveIncome: Double {
         passiveIncomes.reduce(0) { $0 + $1.monthlyAmount }
@@ -18,105 +16,49 @@ final class PassiveIncomeViewModel {
         return (totalMonthlyPassiveIncome / totalIncome) * 100
     }
 
-    func loadPassiveIncomes(workspaceId: UUID) async {
-        latestWorkspaceId = workspaceId
+    func loadPassiveIncomes(context: ModelContext) {
         isLoading = true
-        defer {
-            if latestWorkspaceId == workspaceId {
-                isLoading = false
-            }
-        }
+        defer { isLoading = false }
 
         do {
-            let fetched: [PassiveIncome] = try await service.fetchAll(
-                from: "passive_incomes",
-                filters: [("workspace_id", workspaceId.uuidString)],
-                orderBy: "created_at",
-                ascending: false
-            )
-            guard latestWorkspaceId == workspaceId else { return }
-            passiveIncomes = fetched
+            let descriptor = FetchDescriptor<PassiveIncome>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+            passiveIncomes = try context.fetch(descriptor)
         } catch {
-            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     func createPassiveIncome(
-        workspaceId: UUID,
-        userId: UUID,
-        investmentId: UUID?,
+        context: ModelContext,
+        investment: Investment?,
         type: PassiveIncomeType,
         amount: Double,
         currency: String,
         frequency: PaymentFrequency,
         nextPaymentDate: Date?,
-        description: String?
-    ) async throws {
-        struct NewPassiveIncome: Encodable {
-            let workspace_id: String
-            let user_id: String
-            let investment_id: String?
-            let type: String
-            let amount: Double
-            let currency: String
-            let frequency: String
-            let next_payment_date: String?
-            let description: String?
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        let new = NewPassiveIncome(
-            workspace_id: workspaceId.uuidString,
-            user_id: userId.uuidString,
-            investment_id: investmentId?.uuidString,
-            type: type.rawValue,
+        descriptionText: String?
+    ) {
+        let income = PassiveIncome(
+            investment: investment,
+            type: type,
             amount: amount,
             currency: currency,
-            frequency: frequency.rawValue,
-            next_payment_date: nextPaymentDate.map { dateFormatter.string(from: $0) },
-            description: description
+            frequency: frequency,
+            nextPaymentDate: nextPaymentDate,
+            descriptionText: descriptionText
         )
-
-        let created: PassiveIncome = try await service.insertReturning(into: "passive_incomes", value: new)
-        passiveIncomes.insert(created, at: 0)
+        context.insert(income)
+        try? context.save()
+        passiveIncomes.insert(income, at: 0)
     }
 
-    func updatePassiveIncome(_ income: PassiveIncome) async throws {
-        struct UpdatePayload: Encodable {
-            let investment_id: String?
-            let type: String
-            let amount: Double
-            let frequency: String
-            let next_payment_date: String?
-            let description: String?
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        try await service.update(
-            table: "passive_incomes",
-            id: income.id,
-            value: UpdatePayload(
-                investment_id: income.investmentId?.uuidString,
-                type: income.type.rawValue,
-                amount: income.amount,
-                frequency: income.frequency.rawValue,
-                next_payment_date: income.nextPaymentDate.map { dateFormatter.string(from: $0) },
-                description: income.description
-            )
-        )
-
-        if let idx = passiveIncomes.firstIndex(where: { $0.id == income.id }) {
-            passiveIncomes[idx] = income
-        }
+    func updatePassiveIncome(_ income: PassiveIncome, context: ModelContext) {
+        try? context.save()
     }
 
-    func deletePassiveIncome(_ income: PassiveIncome) async throws {
-        try await service.delete(from: "passive_incomes", id: income.id)
+    func deletePassiveIncome(_ income: PassiveIncome, context: ModelContext) {
+        context.delete(income)
+        try? context.save()
         passiveIncomes.removeAll { $0.id == income.id }
     }
 }

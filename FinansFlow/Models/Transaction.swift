@@ -1,49 +1,58 @@
 import Foundation
+import SwiftData
 
-enum TransactionType: String, Codable, Sendable, CaseIterable {
+enum TransactionType: String, Codable, Sendable, CaseIterable, Hashable {
     case income
     case expense
 }
 
-enum VisibilityScope: String, Codable, Sendable, CaseIterable {
-    case personal
-    case shared
-}
-
-enum RecurrenceInterval: String, Codable, Sendable, CaseIterable {
+enum RecurrenceInterval: String, Codable, Sendable, CaseIterable, Hashable {
     case weekly
     case monthly
     case yearly
 }
 
-struct Transaction: Codable, Identifiable, Sendable {
-    let id: UUID
-    let workspaceId: UUID
-    let userId: UUID
+@Model
+final class Transaction {
+    var id: UUID
     var type: TransactionType
-    var categoryId: UUID?
+    var category: Category?
     var amount: Double
     var currency: String
     var date: Date
-    var description: String?
+    var descriptionText: String?
     var paymentMethod: String?
-    var visibilityScope: VisibilityScope
     var isRecurring: Bool
     var recurrenceInterval: RecurrenceInterval?
     var tags: [String]?
-    let createdAt: Date?
+    var createdAt: Date
     var updatedAt: Date?
 
-    enum CodingKeys: String, CodingKey {
-        case id, type, amount, currency, date, description, tags
-        case workspaceId = "workspace_id"
-        case userId = "user_id"
-        case categoryId = "category_id"
-        case paymentMethod = "payment_method"
-        case visibilityScope = "visibility_scope"
-        case isRecurring = "is_recurring"
-        case recurrenceInterval = "recurrence_interval"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+    init(
+        id: UUID = UUID(),
+        type: TransactionType,
+        category: Category? = nil,
+        amount: Double,
+        currency: String = AppConstants.defaultCurrency,
+        date: Date = Date(),
+        descriptionText: String? = nil,
+        paymentMethod: String? = nil,
+        isRecurring: Bool = false,
+        recurrenceInterval: RecurrenceInterval? = nil,
+        tags: [String]? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.type = type
+        self.category = category
+        self.amount = amount
+        self.currency = currency
+        self.date = date
+        self.descriptionText = descriptionText
+        self.paymentMethod = paymentMethod
+        self.isRecurring = isRecurring
+        self.recurrenceInterval = recurrenceInterval
+        self.tags = tags
+        self.createdAt = createdAt
     }
 }

@@ -1,11 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct LiabilityFormView: View {
-    @Environment(AuthService.self) private var authService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: LiabilityViewModel
 
-    let workspaceId: UUID
     var editingLiability: Liability?
 
     @State private var name = ""
@@ -69,9 +69,7 @@ struct LiabilityFormView: View {
                     Button("İptal") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") {
-                        Task { await save() }
-                    }
+                    Button("Kaydet") { save() }
                     .disabled(name.isEmpty || totalAmount.isEmpty)
                 }
             }
@@ -99,41 +97,34 @@ struct LiabilityFormView: View {
         notes = l.notes ?? ""
     }
 
-    private func save() async {
+    private func save() {
         let total = Double(totalAmount.replacingOccurrences(of: ",", with: ".")) ?? 0
         let remaining = Double(remainingAmount.replacingOccurrences(of: ",", with: ".")) ?? 0
 
-        do {
-            if var existing = editingLiability {
-                existing.name = name
-                existing.type = type
-                existing.totalAmount = total
-                existing.remainingAmount = remaining
-                existing.interestRate = Double(interestRate.replacingOccurrences(of: ",", with: "."))
-                existing.monthlyPayment = Double(monthlyPayment.replacingOccurrences(of: ",", with: "."))
-                existing.dueDate = hasDueDate ? dueDate : nil
-                existing.notes = notes.isEmpty ? nil : notes
-                try await viewModel.updateLiability(existing)
-            } else {
-                guard let userId = authService.currentUser?.id else { return }
-                try await viewModel.createLiability(
-                    workspaceId: workspaceId,
-                    userId: userId,
-                    name: name,
-                    type: type,
-                    totalAmount: total,
-                    remainingAmount: remaining,
-                    interestRate: Double(interestRate.replacingOccurrences(of: ",", with: ".")),
-                    monthlyPayment: Double(monthlyPayment.replacingOccurrences(of: ",", with: ".")),
-                    currency: AppConstants.defaultCurrency,
-                    dueDate: hasDueDate ? dueDate : nil,
-                    notes: notes.isEmpty ? nil : notes
-                )
-            }
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-            showError = true
+        if let existing = editingLiability {
+            existing.name = name
+            existing.type = type
+            existing.totalAmount = total
+            existing.remainingAmount = remaining
+            existing.interestRate = Double(interestRate.replacingOccurrences(of: ",", with: "."))
+            existing.monthlyPayment = Double(monthlyPayment.replacingOccurrences(of: ",", with: "."))
+            existing.dueDate = hasDueDate ? dueDate : nil
+            existing.notes = notes.isEmpty ? nil : notes
+            viewModel.updateLiability(existing, context: modelContext)
+        } else {
+            viewModel.createLiability(
+                context: modelContext,
+                name: name,
+                type: type,
+                totalAmount: total,
+                remainingAmount: remaining,
+                interestRate: Double(interestRate.replacingOccurrences(of: ",", with: ".")),
+                monthlyPayment: Double(monthlyPayment.replacingOccurrences(of: ",", with: ".")),
+                currency: AppConstants.defaultCurrency,
+                dueDate: hasDueDate ? dueDate : nil,
+                notes: notes.isEmpty ? nil : notes
+            )
         }
+        dismiss()
     }
 }

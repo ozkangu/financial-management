@@ -7,8 +7,7 @@ struct OnboardingView: View {
     private let pages: [(icon: String, title: LocalizedStringKey, description: LocalizedStringKey)] = [
         ("chart.bar.fill", "Gelir & Gider Takibi", "Tüm gelir ve giderlerini kategori bazlı takip et, aylık nakit akışını kontrol altında tut."),
         ("chart.pie.fill", "Yatırım Portföyü", "Hisse, fon, kripto ve diğer yatırımlarını tek yerden yönet, kar/zarar durumunu izle."),
-        ("banknote.fill", "Net Varlık", "Varlıkların ve borçlarını gör, toplam net varlığını zaman içinde takip et."),
-        ("person.2.fill", "Ortak Kullanım", "Eşin veya ailenle ortak workspace oluştur, birlikte finansal durumunuzu yönetin.")
+        ("banknote.fill", "Net Varlık", "Varlıkların ve borçlarını gör, toplam net varlığını zaman içinde takip et.")
     ]
 
     var body: some View {

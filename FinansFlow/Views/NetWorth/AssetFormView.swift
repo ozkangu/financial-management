@@ -1,11 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct AssetFormView: View {
-    @Environment(AuthService.self) private var authService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: NetWorthViewModel
 
-    let workspaceId: UUID
     var editingAsset: Asset?
 
     @State private var name = ""
@@ -49,9 +49,7 @@ struct AssetFormView: View {
                     Button("İptal") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") {
-                        Task { await save() }
-                    }
+                    Button("Kaydet") { save() }
                     .disabled(name.isEmpty || value.isEmpty)
                 }
             }
@@ -72,36 +70,29 @@ struct AssetFormView: View {
         notes = asset.notes ?? ""
     }
 
-    private func save() async {
+    private func save() {
         guard let val = Double(value.replacingOccurrences(of: ",", with: ".")) else {
             errorText = "Geçersiz değer"
             showError = true
             return
         }
 
-        do {
-            if var existing = editingAsset {
-                existing.name = name
-                existing.type = type
-                existing.value = val
-                existing.notes = notes.isEmpty ? nil : notes
-                try await viewModel.updateAsset(existing)
-            } else {
-                guard let userId = authService.currentUser?.id else { return }
-                try await viewModel.createAsset(
-                    workspaceId: workspaceId,
-                    userId: userId,
-                    name: name,
-                    type: type,
-                    value: val,
-                    currency: AppConstants.defaultCurrency,
-                    notes: notes.isEmpty ? nil : notes
-                )
-            }
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-            showError = true
+        if let existing = editingAsset {
+            existing.name = name
+            existing.type = type
+            existing.value = val
+            existing.notes = notes.isEmpty ? nil : notes
+            viewModel.updateAsset(existing, context: modelContext)
+        } else {
+            viewModel.createAsset(
+                context: modelContext,
+                name: name,
+                type: type,
+                value: val,
+                currency: AppConstants.defaultCurrency,
+                notes: notes.isEmpty ? nil : notes
+            )
         }
+        dismiss()
     }
 }

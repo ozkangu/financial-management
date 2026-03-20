@@ -1,9 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct CategoryListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: CategoryViewModel
     @Bindable var transactionVM: TransactionViewModel
-    let workspaceId: UUID
 
     @State private var selectedType: CategoryType = .expense
     @State private var showAddSheet = false
@@ -28,36 +29,37 @@ struct CategoryListView: View {
                 Section {
                     CategoryRowView(
                         category: category,
-                        allCategories: viewModel.categories
+                        allCategories: viewModel.categories,
+                        transactions: transactionVM.transactions
                     )
-                        .onTapGesture { editingCategory = category }
+                    .onTapGesture { editingCategory = category }
+                    .swipeActions(edge: .trailing) {
+                        if !category.isDefault {
+                            Button(role: .destructive) {
+                                viewModel.deleteCategory(category, context: modelContext)
+                            } label: {
+                                Label("Sil", systemImage: "trash")
+                            }
+                        }
+                    }
+
+                    ForEach(category.subcategories.sorted(by: { $0.name < $1.name })) { sub in
+                        CategoryRowView(
+                            category: sub,
+                            allCategories: viewModel.categories,
+                            transactions: transactionVM.transactions,
+                            isSubcategory: true
+                        )
+                        .onTapGesture { editingCategory = sub }
                         .swipeActions(edge: .trailing) {
-                            if !category.isDefault {
+                            if !sub.isDefault {
                                 Button(role: .destructive) {
-                                    Task { try? await viewModel.deleteCategory(category) }
+                                    viewModel.deleteCategory(sub, context: modelContext)
                                 } label: {
                                     Label("Sil", systemImage: "trash")
                                 }
                             }
                         }
-
-                    let subs = viewModel.subcategories(of: category.id)
-                    ForEach(subs) { sub in
-                        CategoryRowView(
-                            category: sub,
-                            allCategories: viewModel.categories,
-                            isSubcategory: true
-                        )
-                            .onTapGesture { editingCategory = sub }
-                            .swipeActions(edge: .trailing) {
-                                if !sub.isDefault {
-                                    Button(role: .destructive) {
-                                        Task { try? await viewModel.deleteCategory(sub) }
-                                    } label: {
-                                        Label("Sil", systemImage: "trash")
-                                    }
-                                }
-                            }
                     }
                 }
             }
@@ -75,34 +77,29 @@ struct CategoryListView: View {
         .sheet(isPresented: $showAddSheet) {
             CategoryFormView(
                 viewModel: viewModel,
-                workspaceId: workspaceId,
                 categoryType: selectedType
             )
         }
         .sheet(item: $editingCategory) { category in
             CategoryFormView(
                 viewModel: viewModel,
-                workspaceId: workspaceId,
                 editingCategory: category
             )
-        }
-        .task {
-            await viewModel.loadCategories(workspaceId: workspaceId)
         }
     }
 }
 
 struct CategoryRowView: View {
-    @Environment(TransactionViewModel.self) private var transactionVM
     let category: Category
     let allCategories: [Category]
+    let transactions: [Transaction]
     var isSubcategory: Bool = false
 
     private var budgetSummary: DashboardCategoryBudgetSummary? {
         guard category.type == .expense, (category.monthlyBudget ?? 0) > 0 else { return nil }
         return DashboardMetrics.categoryBudgetSummaries(
             categories: allCategories,
-            transactions: transactionVM.transactions,
+            transactions: transactions,
             referenceDate: Date()
         ).first(where: { $0.id == category.id })
     }
@@ -112,13 +109,16 @@ struct CategoryRowView: View {
             if isSubcategory {
                 Spacer().frame(width: 20)
             }
+
             Image(systemName: category.icon)
                 .font(.title3)
                 .foregroundStyle(Color(hex: category.color))
                 .frame(width: 32)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(category.name)
                     .font(isSubcategory ? .subheadline : .headline)
+
                 if let budgetSummary {
                     Text("Bütçe: \(budgetSummary.spent.formatted()) / \(budgetSummary.budget.formatted())")
                         .font(.caption)
@@ -128,7 +128,9 @@ struct CategoryRowView: View {
                         .tint(categoryBudgetColor(for: budgetSummary.status))
                 }
             }
+
             Spacer()
+
             Image(systemName: "chevron.right")
                 .font(.caption)
                 .foregroundStyle(.tertiary)

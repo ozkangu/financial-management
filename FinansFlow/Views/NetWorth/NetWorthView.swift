@@ -1,20 +1,19 @@
 import SwiftUI
 import Charts
+import SwiftData
 
 struct NetWorthView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var netWorthVM: NetWorthViewModel
     @Bindable var liabilityVM: LiabilityViewModel
-    let workspaceId: UUID
 
     @State private var showAddAsset = false
     @State private var editingAsset: Asset?
 
     init(netWorthVM: NetWorthViewModel = NetWorthViewModel(),
-         liabilityVM: LiabilityViewModel = LiabilityViewModel(),
-         workspaceId: UUID = UUID()) {
+         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
         self.netWorthVM = netWorthVM
         self.liabilityVM = liabilityVM
-        self.workspaceId = workspaceId
     }
 
     private var netWorth: Double {
@@ -25,31 +24,19 @@ struct NetWorthView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Net Worth Summary
                     netWorthSummary
-
-                    // Asset Distribution Chart
                     assetDistributionChart
-
-                    // Net Worth Trend Chart
                     trendChart
-
-                    // Assets List
                     assetsSection
-
-                    // Liabilities Section
                     liabilitiesSection
 
-                    // Snapshot Button
                     Button {
                         HapticManager.impact(.medium)
-                        Task {
-                            try? await netWorthVM.createSnapshot(
-                                workspaceId: workspaceId,
-                                totalLiabilities: liabilityVM.totalDebt
-                            )
-                            HapticManager.notification(.success)
-                        }
+                        netWorthVM.createSnapshot(
+                            context: modelContext,
+                            totalLiabilities: liabilityVM.totalDebt
+                        )
+                        HapticManager.notification(.success)
                     } label: {
                         Label("Snapshot Kaydet", systemImage: "camera.fill")
                             .frame(maxWidth: .infinity)
@@ -71,15 +58,10 @@ struct NetWorthView: View {
                 }
             }
             .sheet(isPresented: $showAddAsset) {
-                AssetFormView(viewModel: netWorthVM, workspaceId: workspaceId)
+                AssetFormView(viewModel: netWorthVM)
             }
             .sheet(item: $editingAsset) { asset in
-                AssetFormView(viewModel: netWorthVM, workspaceId: workspaceId, editingAsset: asset)
-            }
-            .task {
-                await netWorthVM.loadAssets(workspaceId: workspaceId)
-                await netWorthVM.loadSnapshots(workspaceId: workspaceId)
-                await liabilityVM.loadLiabilities(workspaceId: workspaceId)
+                AssetFormView(viewModel: netWorthVM, editingAsset: asset)
             }
         }
     }
@@ -239,7 +221,7 @@ struct NetWorthView: View {
                 }
                 .contextMenu {
                     Button(role: .destructive) {
-                        Task { try? await netWorthVM.deleteAsset(asset) }
+                        netWorthVM.deleteAsset(asset, context: modelContext)
                     } label: {
                         Label("Sil", systemImage: "trash")
                     }
@@ -296,4 +278,5 @@ struct NetWorthView: View {
 
 #Preview {
     NetWorthView()
+        .modelContainer(for: [Asset.self, Liability.self, NetWorthSnapshot.self], inMemory: true)
 }

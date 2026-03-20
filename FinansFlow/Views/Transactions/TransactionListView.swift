@@ -1,9 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct TransactionListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
-    let workspaceId: UUID
 
     @State private var selectedType: TransactionType? = nil
     @State private var searchText = ""
@@ -11,29 +12,26 @@ struct TransactionListView: View {
     @State private var showAddExpense = false
     @State private var editingTransaction: Transaction?
     @State private var showFilter = false
-    @State private var selectedCategoryId: UUID?
-    @State private var selectedVisibilityScope: VisibilityScope?
+    @State private var selectedCategory: Category?
     @State private var useStartDate = false
     @State private var startDate = Date().startOfMonth
     @State private var useEndDate = false
     @State private var endDate = Date()
 
-    init(transactionVM: TransactionViewModel = TransactionViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel(),
-         workspaceId: UUID = UUID()) {
+    init(
+        transactionVM: TransactionViewModel = TransactionViewModel(),
+        categoryVM: CategoryViewModel = CategoryViewModel()
+    ) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
-        self.workspaceId = workspaceId
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Monthly summary
                 MonthlySummaryCard(viewModel: transactionVM)
                     .padding()
 
-                // Segmented control
                 Picker("Tür", selection: $selectedType) {
                     Text("Tümü").tag(TransactionType?.none)
                     Text("Gelir").tag(TransactionType?.some(.income))
@@ -46,7 +44,17 @@ struct TransactionListView: View {
                     activeFiltersBar
                 }
 
-                if transactionVM.visibleTransactions.isEmpty && !transactionVM.isFeedLoading {
+                let filtered = transactionVM.filteredTransactions(
+                    type: selectedType,
+                    category: selectedCategory,
+                    searchText: searchText
+                ).filter { transaction in
+                    if useStartDate, transaction.date < startDate { return false }
+                    if useEndDate, transaction.date > endDate { return false }
+                    return true
+                }
+
+                if filtered.isEmpty && !transactionVM.isLoading {
                     if isFilterResultEmpty {
                         EmptyStateView(
                             icon: "line.3.horizontal.decrease.circle",
@@ -70,10 +78,10 @@ struct TransactionListView: View {
                     }
                 } else {
                     List {
-                        let grouped = Dictionary(grouping: transactionVM.visibleTransactions) { $0.date.displayString }
+                        let grouped = Dictionary(grouping: filtered) { $0.date.displayString }
                         let sortedDates = grouped.keys.sorted { key1, key2 in
-                            let txs1 = grouped[key1]!
-                            let txs2 = grouped[key2]!
+                            let txs1 = grouped[key1] ?? []
+                            let txs2 = grouped[key2] ?? []
                             return (txs1.first?.date ?? Date()) > (txs2.first?.date ?? Date())
                         }
 
@@ -82,7 +90,7 @@ struct TransactionListView: View {
                                 ForEach(grouped[dateStr] ?? []) { tx in
                                     TransactionRowView(
                                         transaction: tx,
-                                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                                        category: tx.category
                                     )
                                     .onTapGesture {
                                         HapticManager.selection()
@@ -90,14 +98,8 @@ struct TransactionListView: View {
                                     }
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
-                                            Task {
-                                                do {
-                                                    try await transactionVM.deleteTransaction(tx)
-                                                    HapticManager.notification(.success)
-                                                } catch {
-                                                    transactionVM.feedErrorMessage = error.localizedDescription
-                                                }
-                                            }
+                                            transactionVM.deleteTransaction(tx, context: modelContext)
+                                            HapticManager.notification(.success)
                                         } label: {
                                             Label("Sil", systemImage: "trash")
                                         }
@@ -112,33 +114,11 @@ struct TransactionListView: View {
                                 }
                             }
                         }
-
-                        if transactionVM.hasMoreFeedPages {
-                            Section {
-                                Button {
-                                    Task {
-                                        await transactionVM.loadTransactionFeed(
-                                            query: currentQuery,
-                                            reset: false
-                                        )
-                                    }
-                                } label: {
-                                    if transactionVM.isFeedLoading {
-                                        ProgressView()
-                                            .frame(maxWidth: .infinity)
-                                    } else {
-                                        Text("Daha Fazla Yükle")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                }
-                                .disabled(transactionVM.isFeedLoading)
-                            }
-                        }
                     }
                     .listStyle(.insetGrouped)
                     .searchable(text: $searchText, prompt: "İşlem ara...")
                     .refreshable {
-                        await transactionVM.loadTransactionFeed(query: currentQuery, reset: true)
+                        transactionVM.loadTransactions(context: modelContext)
                     }
                 }
             }
@@ -173,7 +153,6 @@ struct TransactionListView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceId,
                     transactionType: .income
                 )
             }
@@ -181,96 +160,47 @@ struct TransactionListView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceId,
                     transactionType: .expense
                 )
             }
-            .sheet(item: $editingTransaction) { tx in
+            .sheet(item: $editingTransaction) { transaction in
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceId,
-                    editingTransaction: tx
+                    editingTransaction: transaction
                 )
             }
             .sheet(isPresented: $showFilter) {
                 TransactionFilterSheetView(
                     categoryVM: categoryVM,
                     selectedType: selectedType,
-                    selectedCategoryId: $selectedCategoryId,
-                    selectedVisibilityScope: $selectedVisibilityScope,
+                    selectedCategory: $selectedCategory,
                     useStartDate: $useStartDate,
                     startDate: $startDate,
                     useEndDate: $useEndDate,
                     endDate: $endDate
                 )
             }
-            .onChange(of: selectedType) { _, newValue in
-                normalizeCategoryFilter(selectedType: newValue)
-            }
-            .onChange(of: workspaceId) { _, _ in
-                normalizeCategoryFilter(selectedType: selectedType, resetIfMissing: true)
-            }
-            .onChange(of: categoryVM.categories.map(\.id)) { _, _ in
-                normalizeCategoryFilter(selectedType: selectedType, resetIfMissing: true)
-            }
-            .task(id: currentQuery.cacheKey) {
-                await transactionVM.loadTransactionFeed(query: currentQuery, reset: true)
-            }
-            .alert("Islem Basarisiz", isPresented: Binding(
-                get: { transactionVM.feedErrorMessage != nil },
-                set: { if !$0 { transactionVM.feedErrorMessage = nil } }
-            )) {
-                Button("Tamam", role: .cancel) {}
-            } message: {
-                Text(transactionVM.feedErrorMessage ?? "Bilinmeyen hata")
-            }
         }
     }
 
     private var hasActiveFilters: Bool {
-        selectedCategoryId != nil ||
-        selectedVisibilityScope != nil ||
+        selectedCategory != nil ||
         useStartDate ||
         useEndDate ||
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var isFilterResultEmpty: Bool {
-        TransactionFilterSupport.isFilterResultEmpty(
-            hasTransactions: !transactionVM.transactions.isEmpty,
-            hasActiveFilters: hasActiveFilters,
-            searchText: searchText
-        )
-    }
-
-    private var currentQuery: TransactionFeedQuery {
-        TransactionFeedQuery(
-            workspaceId: workspaceId,
-            type: selectedType,
-            categoryId: selectedCategoryId,
-            visibilityScope: selectedVisibilityScope,
-            searchText: searchText,
-            startDate: useStartDate ? startDate : nil,
-            endDate: useEndDate ? endDate : nil
-        )
+        !transactionVM.transactions.isEmpty && hasActiveFilters
     }
 
     private var activeFiltersBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if let selectedCategoryId,
-                   let category = categoryVM.categories.first(where: { $0.id == selectedCategoryId }) {
-                    FilterChip(label: category.name) {
-                        self.selectedCategoryId = nil
-                    }
-                }
-
-                if let selectedVisibilityScope {
-                    FilterChip(
-                        label: selectedVisibilityScope == .personal ? "Kişisel" : "Ortak"
-                    ) {
-                        self.selectedVisibilityScope = nil
+                if let selectedCategory {
+                    FilterChip(label: selectedCategory.name) {
+                        self.selectedCategory = nil
                     }
                 }
 
@@ -297,23 +227,10 @@ struct TransactionListView: View {
     }
 
     private func clearFilters() {
-        selectedCategoryId = nil
-        selectedVisibilityScope = nil
+        selectedCategory = nil
         useStartDate = false
         useEndDate = false
         searchText = ""
-    }
-
-    private func normalizeCategoryFilter(
-        selectedType: TransactionType?,
-        resetIfMissing: Bool = false
-    ) {
-        selectedCategoryId = TransactionFilterSupport.normalizedCategorySelection(
-            selectedCategoryId: selectedCategoryId,
-            categories: categoryVM.categories,
-            selectedType: selectedType,
-            resetIfMissing: resetIfMissing
-        )
     }
 }
 
@@ -381,7 +298,7 @@ struct TransactionRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(category?.name ?? String(localized: "Kategori Yok"))
                     .font(.subheadline.weight(.medium))
-                if let desc = transaction.description, !desc.isEmpty {
+                if let desc = transaction.descriptionText, !desc.isEmpty {
                     Text(desc)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -413,8 +330,7 @@ struct TransactionFilterSheetView: View {
     @Bindable var categoryVM: CategoryViewModel
     let selectedType: TransactionType?
 
-    @Binding var selectedCategoryId: UUID?
-    @Binding var selectedVisibilityScope: VisibilityScope?
+    @Binding var selectedCategory: Category?
     @Binding var useStartDate: Bool
     @Binding var startDate: Date
     @Binding var useEndDate: Bool
@@ -424,26 +340,12 @@ struct TransactionFilterSheetView: View {
         NavigationStack {
             Form {
                 Section("Kategori") {
-                    Picker("Kategori", selection: $selectedCategoryId) {
-                        Text("Tümü").tag(UUID?.none)
-                        ForEach(
-                            TransactionFilterSupport.availableCategories(
-                                categories: categoryVM.categories,
-                                selectedType: selectedType
-                            )
-                        ) { category in
-                            Text(category.name).tag(UUID?.some(category.id))
+                    Picker("Kategori", selection: $selectedCategory) {
+                        Text("Tümü").tag(Category?.none)
+                        ForEach(availableCategories) { category in
+                            Text(category.name).tag(Category?.some(category))
                         }
                     }
-                }
-
-                Section("Kapsam") {
-                    Picker("Görünürlük", selection: $selectedVisibilityScope) {
-                        Text("Tümü").tag(VisibilityScope?.none)
-                        Text("Kişisel").tag(VisibilityScope?.some(.personal))
-                        Text("Ortak").tag(VisibilityScope?.some(.shared))
-                    }
-                    .pickerStyle(.segmented)
                 }
 
                 Section("Tarih Aralığı") {
@@ -466,8 +368,7 @@ struct TransactionFilterSheetView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Sıfırla") {
-                        selectedCategoryId = nil
-                        selectedVisibilityScope = nil
+                        selectedCategory = nil
                         useStartDate = false
                         useEndDate = false
                     }
@@ -475,45 +376,10 @@ struct TransactionFilterSheetView: View {
             }
         }
     }
-}
 
-enum TransactionFilterSupport {
-    static func availableCategories(
-        categories: [Category],
-        selectedType: TransactionType?
-    ) -> [Category] {
-        guard let selectedType else { return categories }
-        return categories.filter { $0.type.rawValue == selectedType.rawValue }
-    }
-
-    static func normalizedCategorySelection(
-        selectedCategoryId: UUID?,
-        categories: [Category],
-        selectedType: TransactionType?,
-        resetIfMissing: Bool
-    ) -> UUID? {
-        guard let selectedCategoryId else { return nil }
-
-        let availableCategoryIds = Set(
-            availableCategories(
-                categories: categories,
-                selectedType: selectedType
-            ).map(\.id)
-        )
-
-        if resetIfMissing || !availableCategoryIds.contains(selectedCategoryId) {
-            return nil
-        }
-
-        return selectedCategoryId
-    }
-
-    static func isFilterResultEmpty(
-        hasTransactions: Bool,
-        hasActiveFilters: Bool,
-        searchText: String
-    ) -> Bool {
-        hasTransactions && (hasActiveFilters || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    private var availableCategories: [Category] {
+        guard let selectedType else { return categoryVM.categories }
+        return categoryVM.categories.filter { $0.type.rawValue == selectedType.rawValue }
     }
 }
 
@@ -542,4 +408,5 @@ struct FilterChip: View {
 
 #Preview {
     TransactionListView()
+        .modelContainer(for: [Category.self, Transaction.self], inMemory: true)
 }

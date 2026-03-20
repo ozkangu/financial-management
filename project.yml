@@ -45,8 +45,7 @@ targets:
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
     dependencies:
-      - package: supabase-swift
-        product: Supabase
+      - sdk: SwiftData.framework
     postCompileScripts: []
 
   FinansFlowTests:
@@ -72,8 +71,3 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.finansflow.app.uitests
         GENERATE_INFOPLIST_FILE: true
-
-packages:
-  supabase-swift:
-    url: https://github.com/supabase/supabase-swift.git
-    from: "2.0.0"

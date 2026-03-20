@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum InvestmentType: String, Codable, Sendable, CaseIterable {
     case stock
@@ -43,10 +44,9 @@ enum InvestmentType: String, Codable, Sendable, CaseIterable {
     }
 }
 
-struct Investment: Codable, Identifiable, Sendable {
-    let id: UUID
-    let workspaceId: UUID
-    let userId: UUID
+@Model
+final class Investment {
+    var id: UUID
     var name: String
     var type: InvestmentType
     var purchaseDate: Date?
@@ -56,7 +56,9 @@ struct Investment: Codable, Identifiable, Sendable {
     var currency: String
     var institution: String?
     var notes: String?
-    let createdAt: Date?
+    @Relationship(deleteRule: .nullify, inverse: \PassiveIncome.investment)
+    var passiveIncomes: [PassiveIncome]
+    var createdAt: Date
     var updatedAt: Date?
 
     var totalCost: Double {
@@ -72,14 +74,30 @@ struct Investment: Codable, Identifiable, Sendable {
         return (profitLoss / totalCost) * 100
     }
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, type, quantity, currency, institution, notes
-        case workspaceId = "workspace_id"
-        case userId = "user_id"
-        case purchaseDate = "purchase_date"
-        case unitCost = "unit_cost"
-        case currentValue = "current_value"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+    init(
+        id: UUID = UUID(),
+        name: String,
+        type: InvestmentType,
+        purchaseDate: Date? = nil,
+        unitCost: Double = 0,
+        quantity: Double = 0,
+        currentValue: Double = 0,
+        currency: String = AppConstants.defaultCurrency,
+        institution: String? = nil,
+        notes: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.purchaseDate = purchaseDate
+        self.unitCost = unitCost
+        self.quantity = quantity
+        self.currentValue = currentValue
+        self.currency = currency
+        self.institution = institution
+        self.notes = notes
+        self.passiveIncomes = []
+        self.createdAt = createdAt
     }
 }

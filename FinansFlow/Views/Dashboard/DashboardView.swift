@@ -2,10 +2,8 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @Environment(AuthService.self) private var authService
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
-    @Bindable var workspaceVM: WorkspaceViewModel
     @Bindable var passiveIncomeVM: PassiveIncomeViewModel
     @Bindable var netWorthVM: NetWorthViewModel
     @Bindable var liabilityVM: LiabilityViewModel
@@ -13,15 +11,15 @@ struct DashboardView: View {
     @State private var showAddIncome = false
     @State private var showAddExpense = false
 
-    init(transactionVM: TransactionViewModel = TransactionViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel(),
-         workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
-         passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
-         netWorthVM: NetWorthViewModel = NetWorthViewModel(),
-         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
+    init(
+        transactionVM: TransactionViewModel = TransactionViewModel(),
+        categoryVM: CategoryViewModel = CategoryViewModel(),
+        passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
+        netWorthVM: NetWorthViewModel = NetWorthViewModel(),
+        liabilityVM: LiabilityViewModel = LiabilityViewModel()
+    ) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
-        self.workspaceVM = workspaceVM
         self.passiveIncomeVM = passiveIncomeVM
         self.netWorthVM = netWorthVM
         self.liabilityVM = liabilityVM
@@ -73,19 +71,11 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Net Worth Summary Card
                     netWorthCard
-
-                    // Monthly Summary Cards
                     monthlySummaryCards
-
-                    // Income vs Expense Bar Chart (6 months)
                     cashFlowChart
-
-                    // Expense Category Donut Chart
                     expenseCategoryChart
 
-                    // Passive Income & Upcoming Payments
                     HStack(spacing: 12) {
                         passiveIncomeMiniCard
                         upcomingPaymentsCard
@@ -93,20 +83,12 @@ struct DashboardView: View {
                     .padding(.horizontal)
 
                     budgetSection
-
                     insightsSection
-
-                    // Recent Transactions
                     recentTransactionsSection
                 }
                 .padding(.vertical)
             }
             .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    WorkspaceSwitcher(viewModel: workspaceVM)
-                }
-            }
             .overlay(alignment: .bottomTrailing) {
                 floatingActionButton
             }
@@ -114,7 +96,6 @@ struct DashboardView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceVM.activeWorkspace?.id ?? UUID(),
                     transactionType: .income
                 )
             }
@@ -122,14 +103,11 @@ struct DashboardView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceVM.activeWorkspace?.id ?? UUID(),
                     transactionType: .expense
                 )
             }
         }
     }
-
-    // MARK: - Net Worth Card
 
     private var netWorthCard: some View {
         VStack(spacing: 8) {
@@ -140,7 +118,7 @@ struct DashboardView: View {
             if netWorthSummary.hasAnyData {
                 Text(netWorthSummary.netWorth.formatted())
                     .font(.title.bold())
-                    .foregroundStyle(netWorthSummary.isPositive ? Color.primary : Color.red)
+                    .foregroundStyle(netWorthSummary.isPositive ? Color.primary : .red)
 
                 HStack(spacing: 20) {
                     VStack(spacing: 2) {
@@ -187,8 +165,6 @@ struct DashboardView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Monthly Summary Cards
-
     private var monthlySummaryCards: some View {
         HStack(spacing: 12) {
             DashboardSummaryCard(
@@ -212,8 +188,6 @@ struct DashboardView: View {
         }
         .padding(.horizontal)
     }
-
-    // MARK: - Cash Flow Chart (6 months)
 
     private var cashFlowChart: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -265,8 +239,6 @@ struct DashboardView: View {
         return data
     }
 
-    // MARK: - Expense Category Donut Chart
-
     private var expenseCategoryChart: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("GİDER DAĞILIMI")
@@ -298,7 +270,6 @@ struct DashboardView: View {
                 }
                 .frame(height: 180)
 
-                // Legend
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
                     ForEach(categoryData.prefix(6)) { item in
                         HStack(spacing: 4) {
@@ -325,25 +296,23 @@ struct DashboardView: View {
         let monthExpenses = transactionVM.transactions.filter {
             $0.type == .expense && $0.date >= now.startOfMonth && $0.date <= now.endOfMonth
         }
-        let grouped = Dictionary(grouping: monthExpenses) { $0.categoryId }
+        let grouped = Dictionary(grouping: monthExpenses) { $0.category?.id }
         let total = monthExpenses.reduce(0.0) { $0 + $1.amount }
         guard total > 0 else { return [] }
 
         return grouped.compactMap { (catId, txs) -> CategoryChartData? in
             let amount = txs.reduce(0.0) { $0 + $1.amount }
-            let cat = categoryVM.categories.first { $0.id == catId }
+            let category = txs.first?.category
             return CategoryChartData(
                 id: catId ?? UUID(),
-                name: cat?.name ?? String(localized: "Diğer"),
+                name: category?.name ?? String(localized: "Diğer"),
                 amount: amount,
-                color: cat?.color ?? "#999999",
+                color: category?.color ?? "#999999",
                 percentage: (amount / total) * 100
             )
         }
         .sorted { $0.amount > $1.amount }
     }
-
-    // MARK: - Passive Income Mini Card
 
     private var passiveIncomeMiniCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -386,8 +355,6 @@ struct DashboardView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 
-    // MARK: - Upcoming Payments
-
     private var upcomingPaymentsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("YAKLAŞAN")
@@ -405,7 +372,7 @@ struct DashboardView: View {
                         Circle()
                             .fill(tx.type == .income ? Color.green : Color.red)
                             .frame(width: 6, height: 6)
-                        Text(tx.description ?? String(localized: "İşlem"))
+                        Text(tx.descriptionText ?? String(localized: "İşlem"))
                             .font(.caption)
                             .lineLimit(1)
                     }
@@ -418,8 +385,6 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
-
-    // MARK: - Recent Transactions
 
     private var budgetSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -496,39 +461,6 @@ struct DashboardView: View {
         .padding(.horizontal)
     }
 
-    private func summaryColor(for summary: DashboardCategoryBudgetSummary) -> Color {
-        switch summary.status {
-        case .onTrack:
-            return .green
-        case .warning:
-            return .orange
-        case .exceeded:
-            return .red
-        }
-    }
-
-    private func budgetAlertText(for summary: DashboardCategoryBudgetSummary) -> String {
-        switch summary.status {
-        case .exceeded:
-            return "\(summary.name) butcesi \(abs(summary.remaining).formatted()) asildi."
-        case .warning:
-            return "\(summary.name) butcesinin \(Int(summary.utilization * 100))% seviyesine ulasildi."
-        case .onTrack:
-            return "\(summary.name) butcesi plan dahilinde ilerliyor."
-        }
-    }
-
-    private func budgetStatusText(for summary: DashboardCategoryBudgetSummary) -> String {
-        switch summary.status {
-        case .exceeded:
-            return "Butce asimi: \(abs(summary.remaining).formatted())"
-        case .warning:
-            return "Kalan butce: \(max(summary.remaining, 0).formatted())"
-        case .onTrack:
-            return "Kalan butce: \(max(summary.remaining, 0).formatted())"
-        }
-    }
-
     private var recentTransactionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -548,12 +480,12 @@ struct DashboardView: View {
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 8)
             } else {
-                ForEach(recent) { tx in
+                ForEach(recent) { transaction in
                     TransactionRowView(
-                        transaction: tx,
-                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                        transaction: transaction,
+                        category: transaction.category
                     )
-                    if tx.id != recent.last?.id {
+                    if transaction.id != recent.last?.id {
                         Divider()
                     }
                 }
@@ -565,8 +497,6 @@ struct DashboardView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .padding(.horizontal)
     }
-
-    // MARK: - FAB
 
     private var floatingActionButton: some View {
         Menu {
@@ -597,7 +527,38 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Supporting Views
+private extension DashboardView {
+    func summaryColor(for summary: DashboardCategoryBudgetSummary) -> Color {
+        switch summary.status {
+        case .onTrack:
+            return .green
+        case .warning:
+            return .orange
+        case .exceeded:
+            return .red
+        }
+    }
+
+    func budgetAlertText(for summary: DashboardCategoryBudgetSummary) -> String {
+        switch summary.status {
+        case .exceeded:
+            return "\(summary.name) butcesi \(abs(summary.remaining).formatted()) asildi."
+        case .warning:
+            return "\(summary.name) butcesinin \(Int(summary.utilization * 100))% seviyesine ulasildi."
+        case .onTrack:
+            return "\(summary.name) butcesi plan dahilinde ilerliyor."
+        }
+    }
+
+    func budgetStatusText(for summary: DashboardCategoryBudgetSummary) -> String {
+        switch summary.status {
+        case .exceeded:
+            return "Butce asimi: \(abs(summary.remaining).formatted())"
+        case .warning, .onTrack:
+            return "Kalan butce: \(max(summary.remaining, 0).formatted())"
+        }
+    }
+}
 
 struct DashboardSummaryCard: View {
     let title: String
@@ -629,8 +590,6 @@ struct DashboardSummaryCard: View {
     }
 }
 
-// MARK: - Chart Data Models
-
 struct MonthlyChartData: Identifiable {
     let id = UUID()
     let month: String
@@ -648,5 +607,15 @@ struct CategoryChartData: Identifiable {
 
 #Preview {
     DashboardView()
-        .environment(AuthService())
+        .modelContainer(
+            for: [
+                Category.self,
+                Transaction.self,
+                PassiveIncome.self,
+                Asset.self,
+                Liability.self,
+                NetWorthSnapshot.self
+            ],
+            inMemory: true
+        )
 }

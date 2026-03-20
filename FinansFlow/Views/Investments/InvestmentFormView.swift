@@ -1,11 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct InvestmentFormView: View {
-    @Environment(AuthService.self) private var authService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: InvestmentViewModel
 
-    let workspaceId: UUID
     var editingInvestment: Investment?
 
     @State private var name = ""
@@ -69,9 +69,7 @@ struct InvestmentFormView: View {
                     Button("İptal") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") {
-                        Task { await save() }
-                    }
+                    Button("Kaydet") { save() }
                     .disabled(name.isEmpty || currentValue.isEmpty)
                 }
             }
@@ -97,41 +95,35 @@ struct InvestmentFormView: View {
         notes = inv.notes ?? ""
     }
 
-    private func save() async {
+    private func save() {
         let cost = Double(unitCost.replacingOccurrences(of: ",", with: ".")) ?? 0
         let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 0
         let value = Double(currentValue.replacingOccurrences(of: ",", with: ".")) ?? 0
 
-        do {
-            if var existing = editingInvestment {
-                existing.name = name
-                existing.type = type
-                existing.unitCost = cost
-                existing.quantity = qty
-                existing.currentValue = value
-                existing.institution = institution.isEmpty ? nil : institution
-                existing.notes = notes.isEmpty ? nil : notes
-                try await viewModel.updateInvestment(existing)
-            } else {
-                guard let userId = authService.currentUser?.id else { return }
-                try await viewModel.createInvestment(
-                    workspaceId: workspaceId,
-                    userId: userId,
-                    name: name,
-                    type: type,
-                    purchaseDate: purchaseDate,
-                    unitCost: cost,
-                    quantity: qty,
-                    currentValue: value,
-                    currency: currency,
-                    institution: institution.isEmpty ? nil : institution,
-                    notes: notes.isEmpty ? nil : notes
-                )
-            }
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-            showError = true
+        if let existing = editingInvestment {
+            existing.name = name
+            existing.type = type
+            existing.purchaseDate = purchaseDate
+            existing.unitCost = cost
+            existing.quantity = qty
+            existing.currentValue = value
+            existing.institution = institution.isEmpty ? nil : institution
+            existing.notes = notes.isEmpty ? nil : notes
+            viewModel.updateInvestment(existing, context: modelContext)
+        } else {
+            viewModel.createInvestment(
+                context: modelContext,
+                name: name,
+                type: type,
+                purchaseDate: purchaseDate,
+                unitCost: cost,
+                quantity: qty,
+                currentValue: value,
+                currency: currency,
+                institution: institution.isEmpty ? nil : institution,
+                notes: notes.isEmpty ? nil : notes
+            )
         }
+        dismiss()
     }
 }

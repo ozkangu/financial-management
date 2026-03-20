@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 @Observable
 final class CategoryViewModel {
@@ -6,110 +7,65 @@ final class CategoryViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    private let service = SupabaseService.shared
-    private var latestWorkspaceId: UUID?
-
     var incomeCategories: [Category] {
-        categories.filter { $0.type == .income && $0.parentId == nil }
+        categories.filter { $0.type == .income && $0.parent == nil }
     }
 
     var expenseCategories: [Category] {
-        categories.filter { $0.type == .expense && $0.parentId == nil }
+        categories.filter { $0.type == .expense && $0.parent == nil }
     }
 
-    func subcategories(of parentId: UUID) -> [Category] {
-        categories.filter { $0.parentId == parentId }
-    }
-
-    func loadCategories(workspaceId: UUID) async {
-        latestWorkspaceId = workspaceId
+    func loadCategories(context: ModelContext) {
         isLoading = true
-        defer {
-            if latestWorkspaceId == workspaceId {
-                isLoading = false
-            }
-        }
+        defer { isLoading = false }
 
         do {
-            let fetched: [Category] = try await service.fetchAll(
-                from: "categories",
-                filters: [("workspace_id", workspaceId.uuidString)],
-                orderBy: "name",
-                ascending: true
-            )
-            guard latestWorkspaceId == workspaceId else { return }
-            categories = fetched
+            let descriptor = FetchDescriptor<Category>(sortBy: [SortDescriptor(\.name)])
+            categories = try context.fetch(descriptor)
         } catch {
-            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     func createCategory(
-        workspaceId: UUID,
+        context: ModelContext,
         name: String,
         type: CategoryType,
-        parentId: UUID? = nil,
+        parent: Category? = nil,
         color: String = "#007AFF",
         icon: String = "folder.fill",
         monthlyBudget: Double? = nil
-    ) async throws {
-        struct NewCategory: Encodable {
-            let workspace_id: String
-            let name: String
-            let type: String
-            let parent_id: String?
-            let color: String
-            let icon: String
-            let monthly_budget: Double?
-            let is_default: Bool
-        }
-
-        let new = NewCategory(
-            workspace_id: workspaceId.uuidString,
+    ) {
+        let category = Category(
             name: name,
-            type: type.rawValue,
-            parent_id: parentId?.uuidString,
+            type: type,
+            parent: parent,
             color: color,
             icon: icon,
-            monthly_budget: monthlyBudget,
-            is_default: false
+            monthlyBudget: monthlyBudget
         )
-
-        let created: Category = try await service.insertReturning(into: "categories", value: new)
-        categories.append(created)
+        context.insert(category)
+        try? context.save()
+        categories.append(category)
     }
 
-    func updateCategory(_ category: Category) async throws {
-        struct UpdatePayload: Encodable {
-            let name: String
-            let color: String
-            let icon: String
-            let monthly_budget: Double?
-            let parent_id: String?
-        }
-
-        try await service.update(
-            table: "categories",
-            id: category.id,
-            value: UpdatePayload(
-                name: category.name,
-                color: category.color,
-                icon: category.icon,
-                monthly_budget: category.monthlyBudget,
-                parent_id: category.parentId?.uuidString
-            )
-        )
-
+    func updateCategory(_ category: Category, context: ModelContext) {
+        try? context.save()
         if let idx = categories.firstIndex(where: { $0.id == category.id }) {
             categories[idx] = category
         }
     }
 
-    func deleteCategory(_ category: Category) async throws {
-        try await service.delete(from: "categories", id: category.id)
+    func deleteCategory(_ category: Category, context: ModelContext) {
+        let subcats = category.subcategories
+        for sub in subcats {
+            context.delete(sub)
+        }
+        context.delete(category)
+        try? context.save()
         categories.removeAll { $0.id == category.id }
-        // Also remove subcategories
-        categories.removeAll { $0.parentId == category.id }
+        for sub in subcats {
+            categories.removeAll { $0.id == sub.id }
+        }
     }
 }

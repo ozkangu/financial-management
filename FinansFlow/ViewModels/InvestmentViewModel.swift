@@ -1,13 +1,11 @@
 import Foundation
+import SwiftData
 
 @Observable
 final class InvestmentViewModel {
     var investments: [Investment] = []
     var isLoading = false
     var errorMessage: String?
-
-    private let service = SupabaseService.shared
-    private var latestWorkspaceId: UUID?
 
     var totalPortfolioValue: Double {
         investments.reduce(0) { $0 + $1.currentValue }
@@ -37,33 +35,20 @@ final class InvestmentViewModel {
         .sorted { $0.value > $1.value }
     }
 
-    func loadInvestments(workspaceId: UUID) async {
-        latestWorkspaceId = workspaceId
+    func loadInvestments(context: ModelContext) {
         isLoading = true
-        defer {
-            if latestWorkspaceId == workspaceId {
-                isLoading = false
-            }
-        }
+        defer { isLoading = false }
 
         do {
-            let fetched: [Investment] = try await service.fetchAll(
-                from: "investments",
-                filters: [("workspace_id", workspaceId.uuidString)],
-                orderBy: "created_at",
-                ascending: false
-            )
-            guard latestWorkspaceId == workspaceId else { return }
-            investments = fetched
+            let descriptor = FetchDescriptor<Investment>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+            investments = try context.fetch(descriptor)
         } catch {
-            guard latestWorkspaceId == workspaceId else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     func createInvestment(
-        workspaceId: UUID,
-        userId: UUID,
+        context: ModelContext,
         name: String,
         type: InvestmentType,
         purchaseDate: Date?,
@@ -73,74 +58,31 @@ final class InvestmentViewModel {
         currency: String,
         institution: String?,
         notes: String?
-    ) async throws {
-        struct NewInvestment: Encodable {
-            let workspace_id: String
-            let user_id: String
-            let name: String
-            let type: String
-            let purchase_date: String?
-            let unit_cost: Double
-            let quantity: Double
-            let current_value: Double
-            let currency: String
-            let institution: String?
-            let notes: String?
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        let new = NewInvestment(
-            workspace_id: workspaceId.uuidString,
-            user_id: userId.uuidString,
+    ) {
+        let investment = Investment(
             name: name,
-            type: type.rawValue,
-            purchase_date: purchaseDate.map { dateFormatter.string(from: $0) },
-            unit_cost: unitCost,
+            type: type,
+            purchaseDate: purchaseDate,
+            unitCost: unitCost,
             quantity: quantity,
-            current_value: currentValue,
+            currentValue: currentValue,
             currency: currency,
             institution: institution,
             notes: notes
         )
-
-        let created: Investment = try await service.insertReturning(into: "investments", value: new)
-        investments.insert(created, at: 0)
+        context.insert(investment)
+        try? context.save()
+        investments.insert(investment, at: 0)
     }
 
-    func updateInvestment(_ investment: Investment) async throws {
-        struct UpdatePayload: Encodable {
-            let name: String
-            let type: String
-            let unit_cost: Double
-            let quantity: Double
-            let current_value: Double
-            let institution: String?
-            let notes: String?
-        }
-
-        try await service.update(
-            table: "investments",
-            id: investment.id,
-            value: UpdatePayload(
-                name: investment.name,
-                type: investment.type.rawValue,
-                unit_cost: investment.unitCost,
-                quantity: investment.quantity,
-                current_value: investment.currentValue,
-                institution: investment.institution,
-                notes: investment.notes
-            )
-        )
-
-        if let idx = investments.firstIndex(where: { $0.id == investment.id }) {
-            investments[idx] = investment
-        }
+    func updateInvestment(_ investment: Investment, context: ModelContext) {
+        investment.updatedAt = Date()
+        try? context.save()
     }
 
-    func deleteInvestment(_ investment: Investment) async throws {
-        try await service.delete(from: "investments", id: investment.id)
+    func deleteInvestment(_ investment: Investment, context: ModelContext) {
+        context.delete(investment)
+        try? context.save()
         investments.removeAll { $0.id == investment.id }
     }
 }

@@ -132,7 +132,7 @@ enum DashboardMetrics {
             monthlyAmount: monthlyAmount,
             ratio: ratio,
             nextPaymentDate: nextIncome?.nextPaymentDate,
-            nextPaymentDescription: nextIncome?.description ?? nextIncome?.type.displayName
+            nextPaymentDescription: nextIncome?.descriptionText ?? nextIncome?.type.displayName
         )
     }
 
@@ -184,7 +184,7 @@ enum DashboardMetrics {
                 )
                 let spent = expenseTransactions
                     .filter { transaction in
-                        guard let categoryId = transaction.categoryId else { return false }
+                        guard let categoryId = transaction.category?.id else { return false }
                         return includedCategoryIds.contains(categoryId)
                     }
                     .reduce(0) { $0 + $1.amount }
@@ -228,7 +228,7 @@ enum DashboardMetrics {
             $0.date <= referenceDate.endOfMonth
         }
 
-        let grouped = Dictionary(grouping: currentMonthExpenses) { $0.categoryId }
+        let grouped = Dictionary(grouping: currentMonthExpenses) { $0.category?.id }
         guard
             let topCategoryGroup = grouped.max(by: {
                 $0.value.reduce(0) { $0 + $1.amount } < $1.value.reduce(0) { $0 + $1.amount }
@@ -362,7 +362,7 @@ enum DashboardMetrics {
         for rootId: UUID,
         in categories: [Category]
     ) -> Set<UUID> {
-        let childrenByParent = Dictionary(grouping: categories) { $0.parentId }
+        let childrenByParent = Dictionary(grouping: categories) { $0.parent?.id }
 
         func collectChildren(from categoryId: UUID) -> Set<UUID> {
             var collected: Set<UUID> = []

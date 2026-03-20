@@ -1,8 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
-    @Environment(AuthService.self) private var authService
-    @State private var workspaceVM = WorkspaceViewModel()
+    @Environment(\.modelContext) private var modelContext
     @State private var categoryVM = CategoryViewModel()
     @State private var transactionVM = TransactionViewModel()
     @State private var investmentVM = InvestmentViewModel()
@@ -10,42 +10,11 @@ struct ContentView: View {
     @State private var liabilityVM = LiabilityViewModel()
     @State private var netWorthVM = NetWorthViewModel()
 
-    private var wsId: UUID {
-        workspaceVM.activeWorkspace?.id ?? UUID()
-    }
-
-    private var workspaceDataLoader: WorkspaceDataLoader {
-        WorkspaceDataLoader(
-            loadCategories: { workspaceId in
-                await categoryVM.loadCategories(workspaceId: workspaceId)
-            },
-            loadTransactions: { workspaceId in
-                await transactionVM.loadTransactions(workspaceId: workspaceId, reset: true)
-            },
-            loadInvestments: { workspaceId in
-                await investmentVM.loadInvestments(workspaceId: workspaceId)
-            },
-            loadPassiveIncomes: { workspaceId in
-                await passiveIncomeVM.loadPassiveIncomes(workspaceId: workspaceId)
-            },
-            loadLiabilities: { workspaceId in
-                await liabilityVM.loadLiabilities(workspaceId: workspaceId)
-            },
-            loadAssets: { workspaceId in
-                await netWorthVM.loadAssets(workspaceId: workspaceId)
-            },
-            loadSnapshots: { workspaceId in
-                await netWorthVM.loadSnapshots(workspaceId: workspaceId)
-            }
-        )
-    }
-
     var body: some View {
         TabView {
             DashboardView(
                 transactionVM: transactionVM,
                 categoryVM: categoryVM,
-                workspaceVM: workspaceVM,
                 passiveIncomeVM: passiveIncomeVM,
                 netWorthVM: netWorthVM,
                 liabilityVM: liabilityVM
@@ -56,16 +25,14 @@ struct ContentView: View {
 
             TransactionListView(
                 transactionVM: transactionVM,
-                categoryVM: categoryVM,
-                workspaceId: wsId
+                categoryVM: categoryVM
             )
             .tabItem {
                 Label("İşlemler", systemImage: "arrow.left.arrow.right")
             }
 
             InvestmentListView(
-                viewModel: investmentVM,
-                workspaceId: wsId
+                viewModel: investmentVM
             )
             .tabItem {
                 Label("Yatırımlar", systemImage: "chart.pie.fill")
@@ -73,15 +40,13 @@ struct ContentView: View {
 
             NetWorthView(
                 netWorthVM: netWorthVM,
-                liabilityVM: liabilityVM,
-                workspaceId: wsId
+                liabilityVM: liabilityVM
             )
             .tabItem {
                 Label("Varlık", systemImage: "banknote.fill")
             }
 
             MoreView(
-                workspaceVM: workspaceVM,
                 categoryVM: categoryVM,
                 transactionVM: transactionVM,
                 investmentVM: investmentVM,
@@ -93,18 +58,27 @@ struct ContentView: View {
             }
         }
         .task {
-            guard let userId = authService.currentUser?.id,
-                  let name = authService.currentUser?.name else { return }
-            await workspaceVM.ensurePersonalWorkspace(userId: userId, userName: name)
-        }
-        .task(id: workspaceVM.activeWorkspace?.id) {
-            guard let workspaceId = workspaceVM.activeWorkspace?.id else { return }
-            await workspaceDataLoader.reload(workspaceId: workspaceId)
+            CategorySeeder.seedIfNeeded(context: modelContext)
+            categoryVM.loadCategories(context: modelContext)
+            transactionVM.loadTransactions(context: modelContext)
+            investmentVM.loadInvestments(context: modelContext)
+            passiveIncomeVM.loadPassiveIncomes(context: modelContext)
+            liabilityVM.loadLiabilities(context: modelContext)
+            netWorthVM.loadAssets(context: modelContext)
+            netWorthVM.loadSnapshots(context: modelContext)
         }
     }
 }
 
 #Preview {
     ContentView()
-        .environment(AuthService())
+        .modelContainer(for: [
+            Category.self,
+            Transaction.self,
+            Investment.self,
+            PassiveIncome.self,
+            Asset.self,
+            Liability.self,
+            NetWorthSnapshot.self
+        ], inMemory: true)
 }

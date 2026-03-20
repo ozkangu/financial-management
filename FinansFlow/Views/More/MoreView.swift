@@ -1,30 +1,24 @@
 import SwiftUI
 
 struct MoreView: View {
-    @Environment(AuthService.self) private var authService
-    @Bindable var workspaceVM: WorkspaceViewModel
     @Bindable var categoryVM: CategoryViewModel
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var investmentVM: InvestmentViewModel
     @Bindable var passiveIncomeVM: PassiveIncomeViewModel
     @Bindable var liabilityVM: LiabilityViewModel
 
-    init(workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel(),
-         transactionVM: TransactionViewModel = TransactionViewModel(),
-         investmentVM: InvestmentViewModel = InvestmentViewModel(),
-         passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
-         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
-        self.workspaceVM = workspaceVM
+    init(
+        categoryVM: CategoryViewModel = CategoryViewModel(),
+        transactionVM: TransactionViewModel = TransactionViewModel(),
+        investmentVM: InvestmentViewModel = InvestmentViewModel(),
+        passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
+        liabilityVM: LiabilityViewModel = LiabilityViewModel()
+    ) {
         self.categoryVM = categoryVM
         self.transactionVM = transactionVM
         self.investmentVM = investmentVM
         self.passiveIncomeVM = passiveIncomeVM
         self.liabilityVM = liabilityVM
-    }
-
-    private var wsId: UUID {
-        workspaceVM.activeWorkspace?.id ?? UUID()
     }
 
     var body: some View {
@@ -34,8 +28,7 @@ struct MoreView: View {
                     NavigationLink {
                         CategoryListView(
                             viewModel: categoryVM,
-                            transactionVM: transactionVM,
-                            workspaceId: wsId
+                            transactionVM: transactionVM
                         )
                     } label: {
                         Label("Kategoriler", systemImage: "folder.fill")
@@ -44,49 +37,27 @@ struct MoreView: View {
                     NavigationLink {
                         PassiveIncomeListView(
                             viewModel: passiveIncomeVM,
-                            investmentVM: investmentVM,
-                            workspaceId: wsId
+                            investmentVM: investmentVM
                         )
                     } label: {
-                        Label("Pasif Gelirler", systemImage: "chart.bar.fill")
+                        Label("Pasif Gelirler", systemImage: "leaf.fill")
                     }
 
                     NavigationLink {
-                        LiabilityListView(viewModel: liabilityVM, workspaceId: wsId)
+                        LiabilityListView(viewModel: liabilityVM)
                     } label: {
                         Label("Borçlar", systemImage: "creditcard.fill")
-                    }
-                }
-
-                Section("Workspace") {
-                    NavigationLink {
-                        WorkspaceListView(viewModel: workspaceVM)
-                    } label: {
-                        Label("Workspace'ler", systemImage: "person.2.fill")
-                    }
-
-                    NavigationLink {
-                        MemberListView(viewModel: workspaceVM)
-                    } label: {
-                        Label("Üyeler", systemImage: "person.badge.plus")
                     }
                 }
 
                 Section("Uygulama") {
                     NavigationLink {
                         SettingsView(
-                            workspace: workspaceVM.activeWorkspace,
                             transactionVM: transactionVM,
                             categoryVM: categoryVM
                         )
                     } label: {
                         Label("Ayarlar", systemImage: "gearshape.fill")
-                    }
-
-                    Button(role: .destructive) {
-                        Task { await authService.signOut() }
-                    } label: {
-                        Label("Çıkış Yap", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
             }
@@ -97,5 +68,4 @@ struct MoreView: View {
 
 #Preview {
     MoreView()
-        .environment(AuthService())
 }
