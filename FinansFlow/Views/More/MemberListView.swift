@@ -15,9 +15,9 @@ struct MemberListView: View {
                         Image(systemName: member.role == .owner ? "crown.fill" : "person.fill")
                             .foregroundStyle(member.role == .owner ? .orange : .secondary)
                         VStack(alignment: .leading) {
-                            Text(member.userId.uuidString.prefix(8) + "...")
+                            Text(viewModel.displayName(for: member))
                                 .font(.headline)
-                            Text(member.role.rawValue.capitalized)
+                            Text(viewModel.subtitle(for: member))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -35,7 +35,13 @@ struct MemberListView: View {
                         if viewModel.activeWorkspace?.ownerId == authService.currentUser?.id,
                            member.userId != authService.currentUser?.id {
                             Button(role: .destructive) {
-                                Task { try? await viewModel.removeMember(memberId: member.id) }
+                                Task {
+                                    do {
+                                        try await viewModel.removeMember(memberId: member.id)
+                                    } catch {
+                                        viewModel.errorMessage = error.localizedDescription
+                                    }
+                                }
                             } label: {
                                 Label("Çıkar", systemImage: "person.badge.minus")
                             }
@@ -62,14 +68,35 @@ struct MemberListView: View {
                 .textContentType(.emailAddress)
                 .keyboardType(.emailAddress)
             Button("Davet Et") {
-                // In a real app, resolve email to userId via Supabase
-                // For now this is a placeholder
+                guard
+                    let currentUserId = authService.currentUser?.id,
+                    let workspaceId = viewModel.activeWorkspace?.id
+                else { return }
+                Task {
+                    do {
+                        try await viewModel.inviteMember(
+                            email: inviteEmail,
+                            workspaceId: workspaceId,
+                            currentUserId: currentUserId
+                        )
+                    } catch {
+                        viewModel.errorMessage = error.localizedDescription
+                    }
+                }
             }
             Button("İptal", role: .cancel) {}
         } message: {
             Text("Davet edeceğiniz kişinin e-postasını girin")
         }
-        .task {
+        .alert("Islem Basarisiz", isPresented: Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "Bilinmeyen hata")
+        }
+        .task(id: viewModel.activeWorkspace?.id) {
             await viewModel.loadMembers()
         }
     }

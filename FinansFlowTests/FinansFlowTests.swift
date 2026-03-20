@@ -637,6 +637,204 @@ final class FinansFlowTests: XCTestCase {
             "finansflow-is-ev-butcesi-transactions.csv"
         )
     }
+
+    func testWorkspaceViewModelUsesProfileNameAndEmailForMemberPresentation() {
+        let workspaceId = UUID()
+        let userId = UUID()
+        let member = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: userId,
+            role: .member,
+            status: .active,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let viewModel = WorkspaceViewModel()
+        viewModel.memberProfiles = [
+            userId: AppUser(
+                id: userId,
+                email: "user@example.com",
+                name: "Test User",
+                avatarUrl: nil,
+                preferredCurrency: "TRY",
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        XCTAssertEqual(viewModel.displayName(for: member), "Test User")
+        XCTAssertEqual(viewModel.subtitle(for: member), "user@example.com")
+    }
+
+    func testWorkspaceViewModelResolvesStaleActiveWorkspaceToFirstAvailable() {
+        let current = Workspace(
+            id: UUID(),
+            name: "Eski Workspace",
+            ownerId: UUID(),
+            createdAt: nil
+        )
+        let expected = Workspace(
+            id: UUID(),
+            name: "Yeni Workspace",
+            ownerId: UUID(),
+            createdAt: nil
+        )
+        let viewModel = WorkspaceViewModel()
+
+        let resolved = viewModel.resolvedActiveWorkspace(current: current, available: [expected])
+
+        XCTAssertEqual(resolved?.id, expected.id)
+    }
+
+    func testWorkspaceViewModelSortsMembersByStatusRoleAndName() {
+        let workspaceId = UUID()
+        let ownerId = UUID()
+        let memberId = UUID()
+        let pendingId = UUID()
+        let owner = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: ownerId,
+            role: .owner,
+            status: .active,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let member = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: memberId,
+            role: .member,
+            status: .active,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let pending = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: pendingId,
+            role: .member,
+            status: .pending,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let viewModel = WorkspaceViewModel()
+        viewModel.memberProfiles = [
+            ownerId: AppUser(
+                id: ownerId,
+                email: "owner@example.com",
+                name: "Zeynep",
+                avatarUrl: nil,
+                preferredCurrency: "TRY",
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            memberId: AppUser(
+                id: memberId,
+                email: "member@example.com",
+                name: "Ahmet",
+                avatarUrl: nil,
+                preferredCurrency: "TRY",
+                createdAt: nil,
+                updatedAt: nil
+            ),
+            pendingId: AppUser(
+                id: pendingId,
+                email: "pending@example.com",
+                name: "Can",
+                avatarUrl: nil,
+                preferredCurrency: "TRY",
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        let sorted = viewModel.sortedMembers([pending, owner, member])
+
+        XCTAssertEqual(sorted.map(\.userId), [ownerId, memberId, pendingId])
+    }
+
+    func testWorkspaceViewModelFallsBackToEmailAndDefaultWorkspaceName() {
+        let workspaceId = UUID()
+        let userId = UUID()
+        let member = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: userId,
+            role: .member,
+            status: .active,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let invitation = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: userId,
+            role: .member,
+            status: .pending,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let viewModel = WorkspaceViewModel()
+        viewModel.memberProfiles = [
+            userId: AppUser(
+                id: userId,
+                email: "fallback@example.com",
+                name: "",
+                avatarUrl: nil,
+                preferredCurrency: "TRY",
+                createdAt: nil,
+                updatedAt: nil
+            )
+        ]
+
+        XCTAssertEqual(viewModel.displayName(for: member), "fallback@example.com")
+        XCTAssertEqual(viewModel.workspaceName(for: invitation), "Workspace")
+    }
+
+    func testWorkspaceViewModelUsesInvitationWorkspaceName() {
+        let workspaceId = UUID()
+        let invitation = WorkspaceMember(
+            id: UUID(),
+            workspaceId: workspaceId,
+            userId: UUID(),
+            role: .member,
+            status: .pending,
+            invitedAt: nil,
+            acceptedAt: nil
+        )
+        let viewModel = WorkspaceViewModel()
+        viewModel.invitationWorkspaces = [
+            workspaceId: Workspace(
+                id: workspaceId,
+                name: "Ortak Butce",
+                ownerId: UUID(),
+                createdAt: nil
+            )
+        ]
+
+        XCTAssertEqual(viewModel.workspaceName(for: invitation), "Ortak Butce")
+    }
+
+    func testWorkspaceCollaborationErrorsExposeUserFriendlyMessages() {
+        XCTAssertEqual(
+            WorkspaceCollaborationError.invalidEmail.errorDescription,
+            "Gecerli bir e-posta girin."
+        )
+        XCTAssertEqual(
+            WorkspaceCollaborationError.userNotFound.errorDescription,
+            "Bu e-posta ile eslesen kullanici bulunamadi."
+        )
+        XCTAssertEqual(
+            WorkspaceCollaborationError.cannotInviteYourself.errorDescription,
+            "Kendinizi davet edemezsiniz."
+        )
+        XCTAssertEqual(
+            WorkspaceCollaborationError.alreadyMemberOrInvited.errorDescription,
+            "Bu kullanici zaten uye veya bekleyen davet durumunda."
+        )
+    }
 }
 
 private actor CallRecorder {

@@ -8,9 +8,41 @@ struct WorkspaceListView: View {
     @State private var showEditSheet = false
     @State private var editingWorkspace: Workspace?
     @State private var newWorkspaceName = ""
+    @State private var acceptedWorkspaceName: String?
 
     var body: some View {
         List {
+            if !viewModel.pendingInvitations.isEmpty {
+                Section("Bekleyen Davetler") {
+                    ForEach(viewModel.pendingInvitations) { invitation in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(viewModel.workspaceName(for: invitation))
+                                .font(.headline)
+                            Text("Bu workspace sizi bekleyen uye olarak davet etti.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Button("Daveti Kabul Et") {
+                                guard let userId = authService.currentUser?.id else { return }
+                                Task {
+                                    do {
+                                        try await viewModel.acceptInvitation(
+                                            memberId: invitation.id,
+                                            userId: userId
+                                        )
+                                        acceptedWorkspaceName = viewModel.activeWorkspace?.name
+                                    } catch {
+                                        viewModel.errorMessage = error.localizedDescription
+                                    }
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+
             Section("Workspace'lerim") {
                 ForEach(viewModel.workspaces) { ws in
                     HStack {
@@ -37,7 +69,13 @@ struct WorkspaceListView: View {
                     .swipeActions(edge: .trailing) {
                         if ws.ownerId == authService.currentUser?.id {
                             Button(role: .destructive) {
-                                Task { try? await viewModel.deleteWorkspace(ws) }
+                                Task {
+                                    do {
+                                        try await viewModel.deleteWorkspace(ws)
+                                    } catch {
+                                        viewModel.errorMessage = error.localizedDescription
+                                    }
+                                }
                             } label: {
                                 Label("Sil", systemImage: "trash")
                             }
@@ -71,7 +109,11 @@ struct WorkspaceListView: View {
             Button("Oluştur") {
                 guard let userId = authService.currentUser?.id else { return }
                 Task {
-                    try? await viewModel.createWorkspace(name: newWorkspaceName, userId: userId)
+                    do {
+                        try await viewModel.createWorkspace(name: newWorkspaceName, userId: userId)
+                    } catch {
+                        viewModel.errorMessage = error.localizedDescription
+                    }
                 }
             }
             Button("İptal", role: .cancel) {}
@@ -81,9 +123,35 @@ struct WorkspaceListView: View {
             Button("Kaydet") {
                 guard var ws = editingWorkspace else { return }
                 ws.name = newWorkspaceName
-                Task { try? await viewModel.updateWorkspace(ws) }
+                Task {
+                    do {
+                        try await viewModel.updateWorkspace(ws)
+                    } catch {
+                        viewModel.errorMessage = error.localizedDescription
+                    }
+                }
             }
             Button("İptal", role: .cancel) {}
+        }
+        .alert("Islem Basarisiz", isPresented: Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "Bilinmeyen hata")
+        }
+        .alert("Davet Kabul Edildi", isPresented: Binding(
+            get: { acceptedWorkspaceName != nil },
+            set: { if !$0 { acceptedWorkspaceName = nil } }
+        )) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text("\(acceptedWorkspaceName ?? "Workspace") aktif workspace olarak secildi.")
+        }
+        .task {
+            guard let userId = authService.currentUser?.id else { return }
+            await viewModel.loadWorkspaces(userId: userId)
         }
     }
 }
