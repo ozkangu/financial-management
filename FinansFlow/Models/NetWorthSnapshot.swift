@@ -1,20 +1,28 @@
 import Foundation
+import SwiftData
 
-struct NetWorthSnapshot: Codable, Identifiable, Sendable {
-    let id: UUID
-    let workspaceId: UUID
-    let date: Date
-    let totalAssets: Double
-    let totalLiabilities: Double
-    let netWorth: Double
-    let createdAt: Date?
+@Model
+final class NetWorthSnapshot {
+    var id: UUID
+    var date: Date
+    var totalAssets: Double
+    var totalLiabilities: Double
+    var netWorth: Double
+    var createdAt: Date
 
-    enum CodingKeys: String, CodingKey {
-        case id, date
-        case workspaceId = "workspace_id"
-        case totalAssets = "total_assets"
-        case totalLiabilities = "total_liabilities"
-        case netWorth = "net_worth"
-        case createdAt = "created_at"
+    init(
+        id: UUID = UUID(),
+        date: Date = Date(),
+        totalAssets: Double,
+        totalLiabilities: Double,
+        netWorth: Double,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.date = date
+        self.totalAssets = totalAssets
+        self.totalLiabilities = totalLiabilities
+        self.netWorth = netWorth
+        self.createdAt = createdAt
     }
 }

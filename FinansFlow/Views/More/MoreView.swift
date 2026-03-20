@@ -1,27 +1,19 @@
 import SwiftUI
 
 struct MoreView: View {
-    @Environment(AuthService.self) private var authService
-    @Bindable var workspaceVM: WorkspaceViewModel
     @Bindable var categoryVM: CategoryViewModel
     @Bindable var investmentVM: InvestmentViewModel
     @Bindable var passiveIncomeVM: PassiveIncomeViewModel
     @Bindable var liabilityVM: LiabilityViewModel
 
-    init(workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel(),
+    init(categoryVM: CategoryViewModel = CategoryViewModel(),
          investmentVM: InvestmentViewModel = InvestmentViewModel(),
          passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
          liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
-        self.workspaceVM = workspaceVM
         self.categoryVM = categoryVM
         self.investmentVM = investmentVM
         self.passiveIncomeVM = passiveIncomeVM
         self.liabilityVM = liabilityVM
-    }
-
-    private var wsId: UUID {
-        workspaceVM.activeWorkspace?.id ?? UUID()
     }
 
     var body: some View {
@@ -29,7 +21,7 @@ struct MoreView: View {
             List {
                 Section("Finans") {
                     NavigationLink {
-                        CategoryListView(viewModel: categoryVM, workspaceId: wsId)
+                        CategoryListView(viewModel: categoryVM)
                     } label: {
                         Label("Kategoriler", systemImage: "folder.fill")
                     }
@@ -37,31 +29,16 @@ struct MoreView: View {
                     NavigationLink {
                         PassiveIncomeListView(
                             viewModel: passiveIncomeVM,
-                            investmentVM: investmentVM,
-                            workspaceId: wsId
+                            investmentVM: investmentVM
                         )
                     } label: {
-                        Label("Pasif Gelirler", systemImage: "chart.bar.fill")
+                        Label("Pasif Gelirler", systemImage: "leaf.fill")
                     }
 
                     NavigationLink {
-                        LiabilityListView(viewModel: liabilityVM, workspaceId: wsId)
+                        LiabilityListView(viewModel: liabilityVM)
                     } label: {
                         Label("Borçlar", systemImage: "creditcard.fill")
-                    }
-                }
-
-                Section("Workspace") {
-                    NavigationLink {
-                        WorkspaceListView(viewModel: workspaceVM)
-                    } label: {
-                        Label("Workspace'ler", systemImage: "person.2.fill")
-                    }
-
-                    NavigationLink {
-                        MemberListView(viewModel: workspaceVM)
-                    } label: {
-                        Label("Üyeler", systemImage: "person.badge.plus")
                     }
                 }
 
@@ -70,12 +47,6 @@ struct MoreView: View {
                         SettingsView()
                     } label: {
                         Label("Ayarlar", systemImage: "gearshape.fill")
-                    }
-
-                    Button(role: .destructive) {
-                        Task { await authService.signOut() }
-                    } label: {
-                        Label("Çıkış Yap", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
             }
@@ -86,5 +57,4 @@ struct MoreView: View {
 
 #Preview {
     MoreView()
-        .environment(AuthService())
 }

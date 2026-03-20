@@ -1,8 +1,8 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct FinansFlowApp: App {
-    @State private var authService = AuthService()
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @State private var isUnlocked = false
@@ -16,13 +16,19 @@ struct FinansFlowApp: App {
                     BiometricLockView {
                         isUnlocked = true
                     }
-                } else if authService.isAuthenticated {
-                    ContentView()
                 } else {
-                    SignInView()
+                    ContentView()
                 }
             }
-            .environment(authService)
         }
+        .modelContainer(for: [
+            Category.self,
+            Transaction.self,
+            Investment.self,
+            PassiveIncome.self,
+            Asset.self,
+            Liability.self,
+            NetWorthSnapshot.self
+        ])
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum PassiveIncomeType: String, Codable, Sendable, CaseIterable {
     case dividend
@@ -53,29 +54,41 @@ enum PaymentFrequency: String, Codable, Sendable, CaseIterable {
     }
 }
 
-struct PassiveIncome: Codable, Identifiable, Sendable {
-    let id: UUID
-    let workspaceId: UUID
-    let userId: UUID
-    var investmentId: UUID?
+@Model
+final class PassiveIncome {
+    var id: UUID
+    var investment: Investment?
     var type: PassiveIncomeType
     var amount: Double
     var currency: String
     var frequency: PaymentFrequency
     var nextPaymentDate: Date?
-    var description: String?
-    let createdAt: Date?
+    var descriptionText: String?
+    var createdAt: Date
 
     var monthlyAmount: Double {
         amount * frequency.monthlyMultiplier
     }
 
-    enum CodingKeys: String, CodingKey {
-        case id, type, amount, currency, frequency, description
-        case workspaceId = "workspace_id"
-        case userId = "user_id"
-        case investmentId = "investment_id"
-        case nextPaymentDate = "next_payment_date"
-        case createdAt = "created_at"
+    init(
+        id: UUID = UUID(),
+        investment: Investment? = nil,
+        type: PassiveIncomeType,
+        amount: Double,
+        currency: String = AppConstants.defaultCurrency,
+        frequency: PaymentFrequency = .monthly,
+        nextPaymentDate: Date? = nil,
+        descriptionText: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.investment = investment
+        self.type = type
+        self.amount = amount
+        self.currency = currency
+        self.frequency = frequency
+        self.nextPaymentDate = nextPaymentDate
+        self.descriptionText = descriptionText
+        self.createdAt = createdAt
     }
 }

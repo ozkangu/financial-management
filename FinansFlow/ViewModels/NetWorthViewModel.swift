@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 @Observable
 final class NetWorthViewModel {
@@ -6,8 +7,6 @@ final class NetWorthViewModel {
     var snapshots: [NetWorthSnapshot] = []
     var isLoading = false
     var errorMessage: String?
-
-    private let service = SupabaseService.shared
 
     var totalAssets: Double {
         assets.reduce(0) { $0 + $1.value }
@@ -24,121 +23,67 @@ final class NetWorthViewModel {
         .sorted { $0.value > $1.value }
     }
 
-    func loadAssets(workspaceId: UUID) async {
+    func loadAssets(context: ModelContext) {
         isLoading = true
         defer { isLoading = false }
 
         do {
-            assets = try await service.fetchAll(
-                from: "assets",
-                filters: [("workspace_id", workspaceId.uuidString)],
-                orderBy: "created_at",
-                ascending: false
-            )
+            let descriptor = FetchDescriptor<Asset>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+            assets = try context.fetch(descriptor)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func loadSnapshots(workspaceId: UUID) async {
+    func loadSnapshots(context: ModelContext) {
         do {
-            snapshots = try await service.fetchAll(
-                from: "net_worth_snapshots",
-                filters: [("workspace_id", workspaceId.uuidString)],
-                orderBy: "date",
-                ascending: true
-            )
+            let descriptor = FetchDescriptor<NetWorthSnapshot>(sortBy: [SortDescriptor(\.date)])
+            snapshots = try context.fetch(descriptor)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func createAsset(
-        workspaceId: UUID,
-        userId: UUID,
+        context: ModelContext,
         name: String,
         type: AssetType,
         value: Double,
         currency: String,
         notes: String?
-    ) async throws {
-        struct NewAsset: Encodable {
-            let workspace_id: String
-            let user_id: String
-            let name: String
-            let type: String
-            let value: Double
-            let currency: String
-            let notes: String?
-        }
-
-        let created: Asset = try await service.insertReturning(
-            into: "assets",
-            value: NewAsset(
-                workspace_id: workspaceId.uuidString,
-                user_id: userId.uuidString,
-                name: name,
-                type: type.rawValue,
-                value: value,
-                currency: currency,
-                notes: notes
-            )
+    ) {
+        let asset = Asset(
+            name: name,
+            type: type,
+            value: value,
+            currency: currency,
+            notes: notes
         )
-        assets.insert(created, at: 0)
+        context.insert(asset)
+        try? context.save()
+        assets.insert(asset, at: 0)
     }
 
-    func updateAsset(_ asset: Asset) async throws {
-        struct UpdatePayload: Encodable {
-            let name: String
-            let type: String
-            let value: Double
-            let notes: String?
-        }
-
-        try await service.update(
-            table: "assets",
-            id: asset.id,
-            value: UpdatePayload(
-                name: asset.name,
-                type: asset.type.rawValue,
-                value: asset.value,
-                notes: asset.notes
-            )
-        )
-
-        if let idx = assets.firstIndex(where: { $0.id == asset.id }) {
-            assets[idx] = asset
-        }
+    func updateAsset(_ asset: Asset, context: ModelContext) {
+        asset.updatedAt = Date()
+        try? context.save()
     }
 
-    func deleteAsset(_ asset: Asset) async throws {
-        try await service.delete(from: "assets", id: asset.id)
+    func deleteAsset(_ asset: Asset, context: ModelContext) {
+        context.delete(asset)
+        try? context.save()
         assets.removeAll { $0.id == asset.id }
     }
 
-    func createSnapshot(workspaceId: UUID, totalLiabilities: Double) async throws {
-        struct NewSnapshot: Encodable {
-            let workspace_id: String
-            let date: String
-            let total_assets: Double
-            let total_liabilities: Double
-            let net_worth: Double
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
+    func createSnapshot(context: ModelContext, totalLiabilities: Double) {
         let netWorth = totalAssets - totalLiabilities
-        try await service.insert(
-            into: "net_worth_snapshots",
-            value: NewSnapshot(
-                workspace_id: workspaceId.uuidString,
-                date: dateFormatter.string(from: Date()),
-                total_assets: totalAssets,
-                total_liabilities: totalLiabilities,
-                net_worth: netWorth
-            )
+        let snapshot = NetWorthSnapshot(
+            totalAssets: totalAssets,
+            totalLiabilities: totalLiabilities,
+            netWorth: netWorth
         )
-        await loadSnapshots(workspaceId: workspaceId)
+        context.insert(snapshot)
+        try? context.save()
+        loadSnapshots(context: context)
     }
 }

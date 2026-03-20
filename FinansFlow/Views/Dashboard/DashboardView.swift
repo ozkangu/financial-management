@@ -2,20 +2,17 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @Environment(AuthService.self) private var authService
+    @Environment(\.modelContext) private var modelContext
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
-    @Bindable var workspaceVM: WorkspaceViewModel
 
     @State private var showAddIncome = false
     @State private var showAddExpense = false
 
     init(transactionVM: TransactionViewModel = TransactionViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel(),
-         workspaceVM: WorkspaceViewModel = WorkspaceViewModel()) {
+         categoryVM: CategoryViewModel = CategoryViewModel()) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
-        self.workspaceVM = workspaceVM
     }
 
     private let now = Date()
@@ -24,36 +21,22 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Net Worth Summary Card
                     netWorthCard
-
-                    // Monthly Summary Cards
                     monthlySummaryCards
-
-                    // Income vs Expense Bar Chart (6 months)
                     cashFlowChart
-
-                    // Expense Category Donut Chart
                     expenseCategoryChart
 
-                    // Passive Income & Upcoming Payments
                     HStack(spacing: 12) {
                         passiveIncomeMiniCard
                         upcomingPaymentsCard
                     }
                     .padding(.horizontal)
 
-                    // Recent Transactions
                     recentTransactionsSection
                 }
                 .padding(.vertical)
             }
             .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    WorkspaceSwitcher(viewModel: workspaceVM)
-                }
-            }
             .overlay(alignment: .bottomTrailing) {
                 floatingActionButton
             }
@@ -61,7 +44,6 @@ struct DashboardView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceVM.activeWorkspace?.id ?? UUID(),
                     transactionType: .income
                 )
             }
@@ -69,7 +51,6 @@ struct DashboardView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceVM.activeWorkspace?.id ?? UUID(),
                     transactionType: .expense
                 )
             }
@@ -208,7 +189,6 @@ struct DashboardView: View {
                 }
                 .frame(height: 180)
 
-                // Legend
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
                     ForEach(categoryData.prefix(6)) { item in
                         HStack(spacing: 4) {
@@ -235,13 +215,13 @@ struct DashboardView: View {
         let monthExpenses = transactionVM.transactions.filter {
             $0.type == .expense && $0.date >= now.startOfMonth && $0.date <= now.endOfMonth
         }
-        let grouped = Dictionary(grouping: monthExpenses) { $0.categoryId }
+        let grouped = Dictionary(grouping: monthExpenses) { $0.category?.id }
         let total = monthExpenses.reduce(0.0) { $0 + $1.amount }
         guard total > 0 else { return [] }
 
         return grouped.compactMap { (catId, txs) -> CategoryChartData? in
             let amount = txs.reduce(0.0) { $0 + $1.amount }
-            let cat = categoryVM.categories.first { $0.id == catId }
+            let cat = txs.first?.category
             return CategoryChartData(
                 id: catId ?? UUID(),
                 name: cat?.name ?? String(localized: "Diğer"),
@@ -292,7 +272,7 @@ struct DashboardView: View {
                         Circle()
                             .fill(tx.type == .income ? Color.green : Color.red)
                             .frame(width: 6, height: 6)
-                        Text(tx.description ?? String(localized: "İşlem"))
+                        Text(tx.descriptionText ?? String(localized: "İşlem"))
                             .font(.caption)
                             .lineLimit(1)
                     }
@@ -330,7 +310,7 @@ struct DashboardView: View {
                 ForEach(recent) { tx in
                     TransactionRowView(
                         transaction: tx,
-                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                        category: tx.category
                     )
                     if tx.id != recent.last?.id {
                         Divider()
@@ -427,5 +407,5 @@ struct CategoryChartData: Identifiable {
 
 #Preview {
     DashboardView()
-        .environment(AuthService())
+        .modelContainer(for: [Category.self, Transaction.self], inMemory: true)
 }

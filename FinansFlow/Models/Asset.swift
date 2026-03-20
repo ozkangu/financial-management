@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum AssetType: String, Codable, Sendable, CaseIterable {
     case bankAccount = "bank_account"
@@ -34,23 +35,32 @@ enum AssetType: String, Codable, Sendable, CaseIterable {
     }
 }
 
-struct Asset: Codable, Identifiable, Sendable {
-    let id: UUID
-    let workspaceId: UUID
-    let userId: UUID
+@Model
+final class Asset {
+    var id: UUID
     var name: String
     var type: AssetType
     var value: Double
     var currency: String
     var notes: String?
-    let createdAt: Date?
+    var createdAt: Date
     var updatedAt: Date?
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, type, value, currency, notes
-        case workspaceId = "workspace_id"
-        case userId = "user_id"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+    init(
+        id: UUID = UUID(),
+        name: String,
+        type: AssetType,
+        value: Double,
+        currency: String = AppConstants.defaultCurrency,
+        notes: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.value = value
+        self.currency = currency
+        self.notes = notes
+        self.createdAt = createdAt
     }
 }

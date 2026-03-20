@@ -1,21 +1,20 @@
 import SwiftUI
+import SwiftData
 
 struct TransactionFormView: View {
-    @Environment(AuthService.self) private var authService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
 
-    let workspaceId: UUID
     var editingTransaction: Transaction?
     var transactionType: TransactionType = .expense
 
     @State private var amount = ""
     @State private var date = Date()
-    @State private var categoryId: UUID?
-    @State private var description = ""
+    @State private var selectedCategory: Category?
+    @State private var descriptionText = ""
     @State private var paymentMethod = ""
-    @State private var visibilityScope: VisibilityScope = .personal
     @State private var isRecurring = false
     @State private var recurrenceInterval: RecurrenceInterval = .monthly
     @State private var type: TransactionType = .expense
@@ -43,18 +42,18 @@ struct TransactionFormView: View {
                     DatePicker("Tarih", selection: $date, displayedComponents: .date)
 
                     let relevantCategories = categoryVM.categories.filter { $0.type == (type == .income ? .income : .expense) }
-                    Picker("Kategori", selection: $categoryId) {
-                        Text("Seçiniz").tag(UUID?.none)
+                    Picker("Kategori", selection: $selectedCategory) {
+                        Text("Seçiniz").tag(Category?.none)
                         ForEach(relevantCategories) { cat in
                             HStack {
                                 Image(systemName: cat.icon)
-                                Text(cat.parentId != nil ? "  \(cat.name)" : cat.name)
+                                Text(cat.parent != nil ? "  \(cat.name)" : cat.name)
                             }
-                            .tag(UUID?.some(cat.id))
+                            .tag(Category?.some(cat))
                         }
                     }
 
-                    TextField("Açıklama (opsiyonel)", text: $description)
+                    TextField("Açıklama (opsiyonel)", text: $descriptionText)
 
                     if type == .expense {
                         Picker("Ödeme Yöntemi", selection: $paymentMethod) {
@@ -64,14 +63,6 @@ struct TransactionFormView: View {
                             }
                         }
                     }
-                }
-
-                Section("Kapsam") {
-                    Picker("Görünürlük", selection: $visibilityScope) {
-                        Text("Kişisel").tag(VisibilityScope.personal)
-                        Text("Ortak").tag(VisibilityScope.shared)
-                    }
-                    .pickerStyle(.segmented)
                 }
 
                 Section("Tekrarlama") {
@@ -92,9 +83,7 @@ struct TransactionFormView: View {
                     Button("İptal") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") {
-                        Task { await save() }
-                    }
+                    Button("Kaydet") { save() }
                     .disabled(amount.isEmpty)
                 }
             }
@@ -115,53 +104,43 @@ struct TransactionFormView: View {
         type = tx.type
         amount = String(tx.amount)
         date = tx.date
-        categoryId = tx.categoryId
-        description = tx.description ?? ""
+        selectedCategory = tx.category
+        descriptionText = tx.descriptionText ?? ""
         paymentMethod = tx.paymentMethod ?? ""
-        visibilityScope = tx.visibilityScope
         isRecurring = tx.isRecurring
         recurrenceInterval = tx.recurrenceInterval ?? .monthly
     }
 
-    private func save() async {
+    private func save() {
         guard let amountValue = Double(amount.replacingOccurrences(of: ",", with: ".")) else {
             errorText = "Geçersiz tutar"
             showError = true
             return
         }
 
-        do {
-            if var existing = editingTransaction {
-                existing.amount = amountValue
-                existing.date = date
-                existing.categoryId = categoryId
-                existing.description = description.isEmpty ? nil : description
-                existing.paymentMethod = paymentMethod.isEmpty ? nil : paymentMethod
-                existing.visibilityScope = visibilityScope
-                existing.isRecurring = isRecurring
-                existing.recurrenceInterval = isRecurring ? recurrenceInterval : nil
-                try await viewModel.updateTransaction(existing)
-            } else {
-                guard let userId = authService.currentUser?.id else { return }
-                try await viewModel.createTransaction(
-                    workspaceId: workspaceId,
-                    userId: userId,
-                    type: type,
-                    categoryId: categoryId,
-                    amount: amountValue,
-                    date: date,
-                    description: description.isEmpty ? nil : description,
-                    paymentMethod: paymentMethod.isEmpty ? nil : paymentMethod,
-                    visibilityScope: visibilityScope,
-                    isRecurring: isRecurring,
-                    recurrenceInterval: isRecurring ? recurrenceInterval : nil,
-                    tags: nil
-                )
-            }
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-            showError = true
+        if let existing = editingTransaction {
+            existing.amount = amountValue
+            existing.date = date
+            existing.category = selectedCategory
+            existing.descriptionText = descriptionText.isEmpty ? nil : descriptionText
+            existing.paymentMethod = paymentMethod.isEmpty ? nil : paymentMethod
+            existing.isRecurring = isRecurring
+            existing.recurrenceInterval = isRecurring ? recurrenceInterval : nil
+            viewModel.updateTransaction(existing, context: modelContext)
+        } else {
+            viewModel.createTransaction(
+                context: modelContext,
+                type: type,
+                category: selectedCategory,
+                amount: amountValue,
+                date: date,
+                descriptionText: descriptionText.isEmpty ? nil : descriptionText,
+                paymentMethod: paymentMethod.isEmpty ? nil : paymentMethod,
+                isRecurring: isRecurring,
+                recurrenceInterval: isRecurring ? recurrenceInterval : nil,
+                tags: nil
+            )
         }
+        dismiss()
     }
 }

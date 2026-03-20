@@ -2,7 +2,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    @Environment(AuthService.self) private var authService
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     @AppStorage("preferredCurrency") private var preferredCurrency = AppConstants.defaultCurrency
 
@@ -11,21 +10,6 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Profil") {
-                HStack {
-                    Image(systemName: "person.circle.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading) {
-                        Text(authService.currentUser?.name ?? String(localized: "Kullanıcı"))
-                            .font(.headline)
-                        Text(authService.currentUser?.email ?? "")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
             Section("Genel") {
                 Picker("Para Birimi", selection: $preferredCurrency) {
                     ForEach(AppConstants.CurrencyOptions.all, id: \.self) { currency in
@@ -49,7 +33,7 @@ struct SettingsView: View {
             Section("Hakkında") {
                 NavigationLink {
                     ScrollView {
-                        Text("FinansFlow, kişisel ve aile finansınızı yönetmeniz için tasarlanmış bir uygulamadır. Gelir, gider, yatırım ve net varlık takibinizi tek bir yerden yapabilirsiniz.")
+                        Text("FinansFlow, kişisel finansınızı yönetmeniz için tasarlanmış bir uygulamadır. Gelir, gider, yatırım ve net varlık takibinizi tek bir yerden yapabilirsiniz.")
                             .padding()
                     }
                     .navigationTitle("Gizlilik Politikası")
@@ -59,7 +43,7 @@ struct SettingsView: View {
 
                 NavigationLink {
                     ScrollView {
-                        Text("FinansFlow kullanım koşulları: Bu uygulamayı kullanarak, verilerinizin Supabase altyapısında güvenli bir şekilde saklanacağını kabul etmiş olursunuz.")
+                        Text("FinansFlow kullanım koşulları: Bu uygulamayı kullanarak, verilerinizin cihazınızda güvenli bir şekilde saklanacağını kabul etmiş olursunuz.")
                             .padding()
                     }
                     .navigationTitle("Kullanım Koşulları")
@@ -70,7 +54,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Versiyon")
                     Spacer()
-                    Text("1.0.0")
+                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -84,7 +68,6 @@ struct SettingsView: View {
     }
 
     private func exportCSV() {
-        // Create a simple CSV export placeholder
         let csv = String(localized: "Tarih,Tür,Tutar,Kategori,Açıklama") + "\n"
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("finansflow_export.csv")
         try? csv.write(to: tempURL, atomically: true, encoding: .utf8)
