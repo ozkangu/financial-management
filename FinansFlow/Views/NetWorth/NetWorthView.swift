@@ -6,14 +6,19 @@ struct NetWorthView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var netWorthVM: NetWorthViewModel
     @Bindable var liabilityVM: LiabilityViewModel
+    @Bindable var investmentVM: InvestmentViewModel
 
     @State private var showAddAsset = false
     @State private var editingAsset: Asset?
 
-    init(netWorthVM: NetWorthViewModel = NetWorthViewModel(),
-         liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
+    init(
+        netWorthVM: NetWorthViewModel = NetWorthViewModel(),
+        liabilityVM: LiabilityViewModel = LiabilityViewModel(),
+        investmentVM: InvestmentViewModel = InvestmentViewModel()
+    ) {
         self.netWorthVM = netWorthVM
         self.liabilityVM = liabilityVM
+        self.investmentVM = investmentVM
     }
 
     private var netWorth: Double {
@@ -25,7 +30,9 @@ struct NetWorthView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     netWorthSummary
+                    wealthStructureNotice
                     assetDistributionChart
+                    investmentPortfolioSection
                     trendChart
                     assetsSection
                     liabilitiesSection
@@ -47,7 +54,7 @@ struct NetWorthView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Net Varlık")
+            .navigationTitle("Servet")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -99,6 +106,23 @@ struct NetWorthView: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .padding(.horizontal)
+    }
+
+    private var wealthStructureNotice: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Servet Yapısı")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text("Bu ekran yatırım portföyünüzü, diğer varlıklarınızı ve borçlarınızı tek yerden toplar. Net varlık hesabı şu anda yatırım dışı varlıklar ve borçlar üzerinden ilerler.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.accentColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
     }
 
@@ -238,6 +262,68 @@ struct NetWorthView: View {
         .padding(.horizontal)
     }
 
+    private var investmentPortfolioSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("YATIRIM PORTFÖYÜ")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Yatırımlar ayrı sekme yerine burada özetlenir.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    InvestmentListView(viewModel: investmentVM)
+                } label: {
+                    Text("Tümünü Gör")
+                        .font(.caption.weight(.semibold))
+                }
+            }
+
+            if investmentVM.investments.isEmpty {
+                Text("Henüz yatırım yok")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            } else {
+                HStack(spacing: 16) {
+                    miniMetric(
+                        title: "Portföy",
+                        value: investmentVM.totalPortfolioValue.formatted(),
+                        color: .primary
+                    )
+                    miniMetric(
+                        title: "Kar/Zarar",
+                        value: investmentVM.totalProfitLoss.formatted(),
+                        color: investmentVM.totalProfitLoss >= 0 ? .green : .red
+                    )
+                    miniMetric(
+                        title: "Getiri",
+                        value: investmentVM.totalProfitLossPercentage.percentFormatted,
+                        color: investmentVM.totalProfitLoss >= 0 ? .green : .red
+                    )
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(Array(investmentVM.investments.prefix(3))) { investment in
+                        InvestmentRowView(investment: investment)
+                        if investment.id != investmentVM.investments.prefix(3).last?.id {
+                            Divider().padding(.leading, 48)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        .padding(.horizontal)
+    }
+
     private var liabilitiesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("BORÇLAR")
@@ -274,9 +360,27 @@ struct NetWorthView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         .padding(.horizontal)
     }
+
+    private func miniMetric(title: String, value: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption.bold())
+                .foregroundStyle(color)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
 }
 
 #Preview {
     NetWorthView()
-        .modelContainer(for: [Asset.self, Liability.self, NetWorthSnapshot.self], inMemory: true)
+        .modelContainer(for: [Asset.self, Liability.self, NetWorthSnapshot.self, Investment.self, PassiveIncome.self], inMemory: true)
 }

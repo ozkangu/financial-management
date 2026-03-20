@@ -86,6 +86,21 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertTrue(summary.hasAnyData)
     }
 
+    func testInvestmentProfitLossUsesTotalCurrentValueFromUnitPrice() {
+        let investment = Investment(
+            name: "Altin",
+            type: .gold,
+            unitCost: 7_000,
+            quantity: 10,
+            currentValue: 72_000
+        )
+
+        XCTAssertEqual(investment.totalCost, 70_000, accuracy: 0.001)
+        XCTAssertEqual(investment.currentUnitPrice, 7_200, accuracy: 0.001)
+        XCTAssertEqual(investment.profitLoss, 2_000, accuracy: 0.001)
+        XCTAssertEqual(investment.profitLossPercentage, 2.857142857, accuracy: 0.000001)
+    }
+
     func testDashboardCategoryBudgetSummariesHighlightExceededAndWarningBudgets() throws {
         let container = try makeContainer()
         let context = container.mainContext

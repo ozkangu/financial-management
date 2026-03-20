@@ -31,19 +31,13 @@ struct ContentView: View {
                 Label("İşlemler", systemImage: "arrow.left.arrow.right")
             }
 
-            InvestmentListView(
-                viewModel: investmentVM
-            )
-            .tabItem {
-                Label("Yatırımlar", systemImage: "chart.pie.fill")
-            }
-
             NetWorthView(
                 netWorthVM: netWorthVM,
-                liabilityVM: liabilityVM
+                liabilityVM: liabilityVM,
+                investmentVM: investmentVM
             )
             .tabItem {
-                Label("Varlık", systemImage: "banknote.fill")
+                Label("Servet", systemImage: "banknote.fill")
             }
 
             MoreView(
