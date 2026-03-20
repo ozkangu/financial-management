@@ -139,6 +139,65 @@ final class FinansFlowTests: XCTestCase {
         XCTAssertEqual(summary.deltaText, "Son snapshot ile aynı seviyede")
     }
 
+    func testDashboardPassiveIncomeSummaryCalculatesMonthlyAmountRatioAndNextPayment() {
+        let workspaceId = UUID()
+        let userId = UUID()
+        let passiveIncomes = [
+            PassiveIncome(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: userId,
+                investmentId: nil,
+                type: .dividend,
+                amount: 1_200,
+                currency: "TRY",
+                frequency: .monthly,
+                nextPaymentDate: Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 25)),
+                description: "Fon Temettusu",
+                createdAt: nil
+            ),
+            PassiveIncome(
+                id: UUID(),
+                workspaceId: workspaceId,
+                userId: userId,
+                investmentId: nil,
+                type: .rent,
+                amount: 12_000,
+                currency: "TRY",
+                frequency: .yearly,
+                nextPaymentDate: Calendar.current.date(from: DateComponents(year: 2026, month: 4, day: 5)),
+                description: "Depo Kirasi",
+                createdAt: nil
+            )
+        ]
+
+        let summary = DashboardMetrics.passiveIncomeSummary(
+            passiveIncomes: passiveIncomes,
+            totalMonthlyIncome: 10_000
+        )
+
+        XCTAssertEqual(summary.monthlyAmount, 2_200, accuracy: 0.001)
+        XCTAssertEqual(summary.ratio, 22, accuracy: 0.001)
+        XCTAssertEqual(summary.nextPaymentDescription, "Fon Temettusu")
+        XCTAssertEqual(
+            summary.nextPaymentDate,
+            Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 25))
+        )
+        XCTAssertTrue(summary.hasAnyData)
+    }
+
+    func testDashboardPassiveIncomeSummaryShowsEmptyStateWithoutRecords() {
+        let summary = DashboardMetrics.passiveIncomeSummary(
+            passiveIncomes: [],
+            totalMonthlyIncome: 8_000
+        )
+
+        XCTAssertEqual(summary.monthlyAmount, 0)
+        XCTAssertEqual(summary.ratio, 0)
+        XCTAssertNil(summary.nextPaymentDate)
+        XCTAssertFalse(summary.hasAnyData)
+    }
+
     func testFilteredTransactionsSupportsCategoryVisibilityAndDateRange() {
         let workspaceId = UUID()
         let categoryId = UUID()

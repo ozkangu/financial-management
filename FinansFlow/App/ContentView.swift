@@ -46,6 +46,7 @@ struct ContentView: View {
                 transactionVM: transactionVM,
                 categoryVM: categoryVM,
                 workspaceVM: workspaceVM,
+                passiveIncomeVM: passiveIncomeVM,
                 netWorthVM: netWorthVM,
                 liabilityVM: liabilityVM
             )

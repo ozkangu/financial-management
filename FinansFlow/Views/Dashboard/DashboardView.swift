@@ -6,6 +6,7 @@ struct DashboardView: View {
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
     @Bindable var workspaceVM: WorkspaceViewModel
+    @Bindable var passiveIncomeVM: PassiveIncomeViewModel
     @Bindable var netWorthVM: NetWorthViewModel
     @Bindable var liabilityVM: LiabilityViewModel
 
@@ -15,11 +16,13 @@ struct DashboardView: View {
     init(transactionVM: TransactionViewModel = TransactionViewModel(),
          categoryVM: CategoryViewModel = CategoryViewModel(),
          workspaceVM: WorkspaceViewModel = WorkspaceViewModel(),
+         passiveIncomeVM: PassiveIncomeViewModel = PassiveIncomeViewModel(),
          netWorthVM: NetWorthViewModel = NetWorthViewModel(),
          liabilityVM: LiabilityViewModel = LiabilityViewModel()) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
         self.workspaceVM = workspaceVM
+        self.passiveIncomeVM = passiveIncomeVM
         self.netWorthVM = netWorthVM
         self.liabilityVM = liabilityVM
     }
@@ -31,6 +34,13 @@ struct DashboardView: View {
             assets: netWorthVM.assets,
             liabilities: liabilityVM.liabilities,
             snapshots: netWorthVM.snapshots
+        )
+    }
+
+    private var passiveIncomeSummary: DashboardPassiveIncomeSummary {
+        DashboardMetrics.passiveIncomeSummary(
+            passiveIncomes: passiveIncomeVM.passiveIncomes,
+            totalMonthlyIncome: transactionVM.totalIncome(for: now)
         )
     }
 
@@ -311,11 +321,34 @@ struct DashboardView: View {
             Text("PASİF GELİR")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text("--/ay")
-                .font(.headline)
-            Text("Oran: --%")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            if passiveIncomeSummary.hasAnyData {
+                Text("\(passiveIncomeSummary.monthlyAmount.formatted())/ay")
+                    .font(.headline)
+                    .foregroundStyle(.green)
+
+                Text(passiveIncomeSummary.ratioText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let nextPaymentText = passiveIncomeSummary.nextPaymentText {
+                    Text(nextPaymentText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                } else {
+                    Text("Siradaki odeme tarihi yok")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                Text("Pasif gelir kaydi yok")
+                    .font(.subheadline.weight(.medium))
+                Text("Temettu, kira veya faiz geliri ekleyin")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()

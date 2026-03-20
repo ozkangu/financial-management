@@ -27,6 +27,31 @@ struct DashboardNetWorthSummary: Equatable {
     }
 }
 
+struct DashboardPassiveIncomeSummary: Equatable {
+    let monthlyAmount: Double
+    let ratio: Double
+    let nextPaymentDate: Date?
+    let nextPaymentDescription: String?
+
+    var hasAnyData: Bool {
+        monthlyAmount > 0 || nextPaymentDate != nil
+    }
+
+    var ratioText: String {
+        "Oran: \(ratio.percentFormatted)"
+    }
+
+    var nextPaymentText: String? {
+        guard let nextPaymentDate else { return nil }
+
+        if let nextPaymentDescription, !nextPaymentDescription.isEmpty {
+            return "\(nextPaymentDescription) • \(nextPaymentDate.displayString)"
+        }
+
+        return "Siradaki odeme: \(nextPaymentDate.displayString)"
+    }
+}
+
 enum DashboardMetrics {
     static func netWorthSummary(
         assets: [Asset],
@@ -44,6 +69,32 @@ enum DashboardMetrics {
             totalLiabilities: totalLiabilities,
             netWorth: netWorth,
             deltaAmount: deltaAmount
+        )
+    }
+
+    static func passiveIncomeSummary(
+        passiveIncomes: [PassiveIncome],
+        totalMonthlyIncome: Double
+    ) -> DashboardPassiveIncomeSummary {
+        let monthlyAmount = passiveIncomes.reduce(0) { $0 + $1.monthlyAmount }
+        let ratio = totalMonthlyIncome > 0 ? (monthlyAmount / totalMonthlyIncome) * 100 : 0
+        let nextIncome = passiveIncomes
+            .filter { income in
+                guard let nextPaymentDate = income.nextPaymentDate else { return false }
+                return nextPaymentDate >= Calendar.current.startOfDay(for: Date())
+            }
+            .min { lhs, rhs in
+                guard let lhsDate = lhs.nextPaymentDate, let rhsDate = rhs.nextPaymentDate else {
+                    return false
+                }
+                return lhsDate < rhsDate
+            }
+
+        return DashboardPassiveIncomeSummary(
+            monthlyAmount: monthlyAmount,
+            ratio: ratio,
+            nextPaymentDate: nextIncome?.nextPaymentDate,
+            nextPaymentDescription: nextIncome?.description ?? nextIncome?.type.displayName
         )
     }
 }
