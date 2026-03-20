@@ -1,16 +1,17 @@
 import SwiftUI
+import SwiftData
 
 struct CategoryFormView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: CategoryViewModel
 
-    let workspaceId: UUID
     var editingCategory: Category?
     var categoryType: CategoryType = .expense
 
     @State private var name = ""
     @State private var type: CategoryType = .expense
-    @State private var parentId: UUID?
+    @State private var selectedParent: Category?
     @State private var color = "#007AFF"
     @State private var icon = "folder.fill"
     @State private var monthlyBudget = ""
@@ -53,13 +54,13 @@ struct CategoryFormView: View {
                     }
 
                     let parents = viewModel.categories.filter {
-                        $0.type == type && $0.parentId == nil && $0.id != editingCategory?.id
+                        $0.type == type && $0.parent == nil && $0.id != editingCategory?.id
                     }
                     if !parents.isEmpty {
-                        Picker("Üst Kategori", selection: $parentId) {
-                            Text("Yok (Ana Kategori)").tag(UUID?.none)
+                        Picker("Üst Kategori", selection: $selectedParent) {
+                            Text("Yok (Ana Kategori)").tag(Category?.none)
                             ForEach(parents) { parent in
-                                Text(parent.name).tag(UUID?.some(parent.id))
+                                Text(parent.name).tag(Category?.some(parent))
                             }
                         }
                     }
@@ -115,9 +116,7 @@ struct CategoryFormView: View {
                     Button("İptal") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") {
-                        Task { await save() }
-                    }
+                    Button("Kaydet") { save() }
                     .disabled(name.isEmpty)
                 }
             }
@@ -137,38 +136,33 @@ struct CategoryFormView: View {
         }
         name = cat.name
         type = cat.type
-        parentId = cat.parentId
+        selectedParent = cat.parent
         color = cat.color
         icon = cat.icon
         monthlyBudget = cat.monthlyBudget.map { String($0) } ?? ""
     }
 
-    private func save() async {
-        let budget = Double(monthlyBudget)
+    private func save() {
+        let budget = Double(monthlyBudget.replacingOccurrences(of: ",", with: "."))
 
-        do {
-            if var existing = editingCategory {
-                existing.name = name
-                existing.parentId = parentId
-                existing.color = color
-                existing.icon = icon
-                existing.monthlyBudget = budget
-                try await viewModel.updateCategory(existing)
-            } else {
-                try await viewModel.createCategory(
-                    workspaceId: workspaceId,
-                    name: name,
-                    type: type,
-                    parentId: parentId,
-                    color: color,
-                    icon: icon,
-                    monthlyBudget: budget
-                )
-            }
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-            showError = true
+        if let existing = editingCategory {
+            existing.name = name
+            existing.parent = selectedParent
+            existing.color = color
+            existing.icon = icon
+            existing.monthlyBudget = budget
+            viewModel.updateCategory(existing, context: modelContext)
+        } else {
+            viewModel.createCategory(
+                context: modelContext,
+                name: name,
+                type: type,
+                parent: selectedParent,
+                color: color,
+                icon: icon,
+                monthlyBudget: budget
+            )
         }
+        dismiss()
     }
 }

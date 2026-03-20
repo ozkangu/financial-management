@@ -1,20 +1,20 @@
 import SwiftUI
+import SwiftData
 
 struct PassiveIncomeFormView: View {
-    @Environment(AuthService.self) private var authService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: PassiveIncomeViewModel
     @Bindable var investmentVM: InvestmentViewModel
 
-    let workspaceId: UUID
     var editingIncome: PassiveIncome?
 
-    @State private var investmentId: UUID?
+    @State private var selectedInvestment: Investment?
     @State private var type: PassiveIncomeType = .dividend
     @State private var amount = ""
     @State private var frequency: PaymentFrequency = .monthly
     @State private var nextPaymentDate = Date()
-    @State private var description = ""
+    @State private var descriptionText = ""
     @State private var showError = false
     @State private var errorText = ""
 
@@ -34,10 +34,10 @@ struct PassiveIncomeFormView: View {
                         }
                     }
 
-                    Picker("Bağlı Yatırım", selection: $investmentId) {
-                        Text("Yok").tag(UUID?.none)
+                    Picker("Bağlı Yatırım", selection: $selectedInvestment) {
+                        Text("Yok").tag(Investment?.none)
                         ForEach(investmentVM.investments) { inv in
-                            Text(inv.name).tag(UUID?.some(inv.id))
+                            Text(inv.name).tag(Investment?.some(inv))
                         }
                     }
                 }
@@ -56,7 +56,7 @@ struct PassiveIncomeFormView: View {
                 }
 
                 Section("Açıklama") {
-                    TextField("Açıklama (opsiyonel)", text: $description)
+                    TextField("Açıklama (opsiyonel)", text: $descriptionText)
                 }
             }
             .navigationTitle(isEditing ? "Pasif Gelir Düzenle" : "Pasif Gelir Ekle")
@@ -66,9 +66,7 @@ struct PassiveIncomeFormView: View {
                     Button("İptal") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") {
-                        Task { await save() }
-                    }
+                    Button("Kaydet") { save() }
                     .disabled(amount.isEmpty)
                 }
             }
@@ -83,48 +81,41 @@ struct PassiveIncomeFormView: View {
 
     private func loadExisting() {
         guard let inc = editingIncome else { return }
-        investmentId = inc.investmentId
+        selectedInvestment = inc.investment
         type = inc.type
         amount = String(inc.amount)
         frequency = inc.frequency
         nextPaymentDate = inc.nextPaymentDate ?? Date()
-        description = inc.description ?? ""
+        descriptionText = inc.descriptionText ?? ""
     }
 
-    private func save() async {
+    private func save() {
         guard let amountValue = Double(amount.replacingOccurrences(of: ",", with: ".")) else {
             errorText = "Geçersiz tutar"
             showError = true
             return
         }
 
-        do {
-            if var existing = editingIncome {
-                existing.investmentId = investmentId
-                existing.type = type
-                existing.amount = amountValue
-                existing.frequency = frequency
-                existing.nextPaymentDate = nextPaymentDate
-                existing.description = description.isEmpty ? nil : description
-                try await viewModel.updatePassiveIncome(existing)
-            } else {
-                guard let userId = authService.currentUser?.id else { return }
-                try await viewModel.createPassiveIncome(
-                    workspaceId: workspaceId,
-                    userId: userId,
-                    investmentId: investmentId,
-                    type: type,
-                    amount: amountValue,
-                    currency: AppConstants.defaultCurrency,
-                    frequency: frequency,
-                    nextPaymentDate: nextPaymentDate,
-                    description: description.isEmpty ? nil : description
-                )
-            }
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-            showError = true
+        if let existing = editingIncome {
+            existing.investment = selectedInvestment
+            existing.type = type
+            existing.amount = amountValue
+            existing.frequency = frequency
+            existing.nextPaymentDate = nextPaymentDate
+            existing.descriptionText = descriptionText.isEmpty ? nil : descriptionText
+            viewModel.updatePassiveIncome(existing, context: modelContext)
+        } else {
+            viewModel.createPassiveIncome(
+                context: modelContext,
+                investment: selectedInvestment,
+                type: type,
+                amount: amountValue,
+                currency: AppConstants.defaultCurrency,
+                frequency: frequency,
+                nextPaymentDate: nextPaymentDate,
+                descriptionText: descriptionText.isEmpty ? nil : descriptionText
+            )
         }
+        dismiss()
     }
 }

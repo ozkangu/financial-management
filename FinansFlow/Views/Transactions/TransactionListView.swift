@@ -1,9 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct TransactionListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var transactionVM: TransactionViewModel
     @Bindable var categoryVM: CategoryViewModel
-    let workspaceId: UUID
 
     @State private var selectedType: TransactionType? = nil
     @State private var searchText = ""
@@ -13,21 +14,17 @@ struct TransactionListView: View {
     @State private var showFilter = false
 
     init(transactionVM: TransactionViewModel = TransactionViewModel(),
-         categoryVM: CategoryViewModel = CategoryViewModel(),
-         workspaceId: UUID = UUID()) {
+         categoryVM: CategoryViewModel = CategoryViewModel()) {
         self.transactionVM = transactionVM
         self.categoryVM = categoryVM
-        self.workspaceId = workspaceId
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Monthly summary
                 MonthlySummaryCard(viewModel: transactionVM)
                     .padding()
 
-                // Segmented control
                 Picker("Tür", selection: $selectedType) {
                     Text("Tümü").tag(TransactionType?.none)
                     Text("Gelir").tag(TransactionType?.some(.income))
@@ -36,7 +33,6 @@ struct TransactionListView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
-                // Transaction list
                 let filtered = transactionVM.filteredTransactions(
                     type: selectedType,
                     searchText: searchText
@@ -65,7 +61,7 @@ struct TransactionListView: View {
                                 ForEach(grouped[dateStr] ?? []) { tx in
                                     TransactionRowView(
                                         transaction: tx,
-                                        category: categoryVM.categories.first { $0.id == tx.categoryId }
+                                        category: tx.category
                                     )
                                     .onTapGesture {
                                         HapticManager.selection()
@@ -73,10 +69,8 @@ struct TransactionListView: View {
                                     }
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
-                                            Task {
-                                                try? await transactionVM.deleteTransaction(tx)
-                                                HapticManager.notification(.success)
-                                            }
+                                            transactionVM.deleteTransaction(tx, context: modelContext)
+                                            HapticManager.notification(.success)
                                         } label: {
                                             Label("Sil", systemImage: "trash")
                                         }
@@ -95,7 +89,7 @@ struct TransactionListView: View {
                     .listStyle(.insetGrouped)
                     .searchable(text: $searchText, prompt: "İşlem ara...")
                     .refreshable {
-                        await transactionVM.loadTransactions(workspaceId: workspaceId, reset: true)
+                        transactionVM.loadTransactions(context: modelContext)
                     }
                 }
             }
@@ -122,7 +116,6 @@ struct TransactionListView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceId,
                     transactionType: .income
                 )
             }
@@ -130,7 +123,6 @@ struct TransactionListView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceId,
                     transactionType: .expense
                 )
             }
@@ -138,7 +130,6 @@ struct TransactionListView: View {
                 TransactionFormView(
                     viewModel: transactionVM,
                     categoryVM: categoryVM,
-                    workspaceId: workspaceId,
                     editingTransaction: tx
                 )
             }
@@ -210,7 +201,7 @@ struct TransactionRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(category?.name ?? String(localized: "Kategori Yok"))
                     .font(.subheadline.weight(.medium))
-                if let desc = transaction.description, !desc.isEmpty {
+                if let desc = transaction.descriptionText, !desc.isEmpty {
                     Text(desc)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -239,4 +230,5 @@ struct TransactionRowView: View {
 
 #Preview {
     TransactionListView()
+        .modelContainer(for: [Category.self, Transaction.self], inMemory: true)
 }

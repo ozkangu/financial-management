@@ -1,15 +1,15 @@
 import SwiftUI
+import SwiftData
 
 struct LiabilityListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: LiabilityViewModel
-    let workspaceId: UUID
 
     @State private var showAddSheet = false
     @State private var editingLiability: Liability?
 
     var body: some View {
         List {
-            // Summary section
             Section {
                 HStack {
                     VStack(alignment: .leading) {
@@ -32,7 +32,6 @@ struct LiabilityListView: View {
                 .padding(.vertical, 4)
             }
 
-            // Liability list
             if viewModel.liabilities.isEmpty {
                 Section {
                     EmptyStateView(
@@ -55,10 +54,8 @@ struct LiabilityListView: View {
                             }
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
-                                    Task {
-                                        try? await viewModel.deleteLiability(liability)
-                                        HapticManager.notification(.success)
-                                    }
+                                    viewModel.deleteLiability(liability, context: modelContext)
+                                    HapticManager.notification(.success)
                                 } label: {
                                     Label("Sil", systemImage: "trash")
                                 }
@@ -78,13 +75,10 @@ struct LiabilityListView: View {
             }
         }
         .sheet(isPresented: $showAddSheet) {
-            LiabilityFormView(viewModel: viewModel, workspaceId: workspaceId)
+            LiabilityFormView(viewModel: viewModel)
         }
         .sheet(item: $editingLiability) { liability in
-            LiabilityFormView(viewModel: viewModel, workspaceId: workspaceId, editingLiability: liability)
-        }
-        .task {
-            await viewModel.loadLiabilities(workspaceId: workspaceId)
+            LiabilityFormView(viewModel: viewModel, editingLiability: liability)
         }
     }
 }
@@ -122,7 +116,6 @@ struct LiabilityRowView: View {
                 }
             }
 
-            // Progress bar
             ProgressView(value: liability.paidPercentage, total: 100)
                 .tint(.green)
 

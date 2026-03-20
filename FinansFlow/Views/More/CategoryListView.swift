@@ -1,8 +1,9 @@
 import SwiftUI
+import SwiftData
 
 struct CategoryListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: CategoryViewModel
-    let workspaceId: UUID
 
     @State private var selectedType: CategoryType = .expense
     @State private var showAddSheet = false
@@ -30,21 +31,20 @@ struct CategoryListView: View {
                         .swipeActions(edge: .trailing) {
                             if !category.isDefault {
                                 Button(role: .destructive) {
-                                    Task { try? await viewModel.deleteCategory(category) }
+                                    viewModel.deleteCategory(category, context: modelContext)
                                 } label: {
                                     Label("Sil", systemImage: "trash")
                                 }
                             }
                         }
 
-                    let subs = viewModel.subcategories(of: category.id)
-                    ForEach(subs) { sub in
+                    ForEach(category.subcategories) { sub in
                         CategoryRowView(category: sub, isSubcategory: true)
                             .onTapGesture { editingCategory = sub }
                             .swipeActions(edge: .trailing) {
                                 if !sub.isDefault {
                                     Button(role: .destructive) {
-                                        Task { try? await viewModel.deleteCategory(sub) }
+                                        viewModel.deleteCategory(sub, context: modelContext)
                                     } label: {
                                         Label("Sil", systemImage: "trash")
                                     }
@@ -67,19 +67,14 @@ struct CategoryListView: View {
         .sheet(isPresented: $showAddSheet) {
             CategoryFormView(
                 viewModel: viewModel,
-                workspaceId: workspaceId,
                 categoryType: selectedType
             )
         }
         .sheet(item: $editingCategory) { category in
             CategoryFormView(
                 viewModel: viewModel,
-                workspaceId: workspaceId,
                 editingCategory: category
             )
-        }
-        .task {
-            await viewModel.loadCategories(workspaceId: workspaceId)
         }
     }
 }

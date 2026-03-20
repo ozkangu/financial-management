@@ -1,8 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
-    @Environment(AuthService.self) private var authService
-    @State private var workspaceVM = WorkspaceViewModel()
+    @Environment(\.modelContext) private var modelContext
     @State private var categoryVM = CategoryViewModel()
     @State private var transactionVM = TransactionViewModel()
     @State private var investmentVM = InvestmentViewModel()
@@ -10,16 +10,11 @@ struct ContentView: View {
     @State private var liabilityVM = LiabilityViewModel()
     @State private var netWorthVM = NetWorthViewModel()
 
-    private var wsId: UUID {
-        workspaceVM.activeWorkspace?.id ?? UUID()
-    }
-
     var body: some View {
         TabView {
             DashboardView(
                 transactionVM: transactionVM,
-                categoryVM: categoryVM,
-                workspaceVM: workspaceVM
+                categoryVM: categoryVM
             )
             .tabItem {
                 Label("Dashboard", systemImage: "chart.bar.fill")
@@ -27,16 +22,14 @@ struct ContentView: View {
 
             TransactionListView(
                 transactionVM: transactionVM,
-                categoryVM: categoryVM,
-                workspaceId: wsId
+                categoryVM: categoryVM
             )
             .tabItem {
                 Label("İşlemler", systemImage: "arrow.left.arrow.right")
             }
 
             InvestmentListView(
-                viewModel: investmentVM,
-                workspaceId: wsId
+                viewModel: investmentVM
             )
             .tabItem {
                 Label("Yatırımlar", systemImage: "chart.pie.fill")
@@ -44,15 +37,13 @@ struct ContentView: View {
 
             NetWorthView(
                 netWorthVM: netWorthVM,
-                liabilityVM: liabilityVM,
-                workspaceId: wsId
+                liabilityVM: liabilityVM
             )
             .tabItem {
                 Label("Varlık", systemImage: "banknote.fill")
             }
 
             MoreView(
-                workspaceVM: workspaceVM,
                 categoryVM: categoryVM,
                 investmentVM: investmentVM,
                 passiveIncomeVM: passiveIncomeVM,
@@ -63,23 +54,27 @@ struct ContentView: View {
             }
         }
         .task {
-            guard let userId = authService.currentUser?.id,
-                  let name = authService.currentUser?.name else { return }
-            await workspaceVM.ensurePersonalWorkspace(userId: userId, userName: name)
-            if let wsId = workspaceVM.activeWorkspace?.id {
-                await categoryVM.loadCategories(workspaceId: wsId)
-                await transactionVM.loadTransactions(workspaceId: wsId, reset: true)
-                await investmentVM.loadInvestments(workspaceId: wsId)
-                await passiveIncomeVM.loadPassiveIncomes(workspaceId: wsId)
-                await liabilityVM.loadLiabilities(workspaceId: wsId)
-                await netWorthVM.loadAssets(workspaceId: wsId)
-                await netWorthVM.loadSnapshots(workspaceId: wsId)
-            }
+            CategorySeeder.seedIfNeeded(context: modelContext)
+            categoryVM.loadCategories(context: modelContext)
+            transactionVM.loadTransactions(context: modelContext)
+            investmentVM.loadInvestments(context: modelContext)
+            passiveIncomeVM.loadPassiveIncomes(context: modelContext)
+            liabilityVM.loadLiabilities(context: modelContext)
+            netWorthVM.loadAssets(context: modelContext)
+            netWorthVM.loadSnapshots(context: modelContext)
         }
     }
 }
 
 #Preview {
     ContentView()
-        .environment(AuthService())
+        .modelContainer(for: [
+            Category.self,
+            Transaction.self,
+            Investment.self,
+            PassiveIncome.self,
+            Asset.self,
+            Liability.self,
+            NetWorthSnapshot.self
+        ], inMemory: true)
 }

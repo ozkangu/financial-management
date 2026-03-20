@@ -1,9 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct PassiveIncomeListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: PassiveIncomeViewModel
     @Bindable var investmentVM: InvestmentViewModel
-    let workspaceId: UUID
     var totalMonthlyIncome: Double = 0
 
     @State private var showAddSheet = false
@@ -52,7 +53,7 @@ struct PassiveIncomeListView: View {
                     ForEach(viewModel.passiveIncomes) { income in
                         PassiveIncomeRowView(
                             income: income,
-                            investmentName: investmentVM.investments.first { $0.id == income.investmentId }?.name
+                            investmentName: income.investment?.name
                         )
                         .onTapGesture {
                             HapticManager.selection()
@@ -60,10 +61,8 @@ struct PassiveIncomeListView: View {
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
-                                Task {
-                                    try? await viewModel.deletePassiveIncome(income)
-                                    HapticManager.notification(.success)
-                                }
+                                viewModel.deletePassiveIncome(income, context: modelContext)
+                                HapticManager.notification(.success)
                             } label: {
                                 Label("Sil", systemImage: "trash")
                             }
@@ -85,20 +84,15 @@ struct PassiveIncomeListView: View {
         .sheet(isPresented: $showAddSheet) {
             PassiveIncomeFormView(
                 viewModel: viewModel,
-                investmentVM: investmentVM,
-                workspaceId: workspaceId
+                investmentVM: investmentVM
             )
         }
         .sheet(item: $editingIncome) { income in
             PassiveIncomeFormView(
                 viewModel: viewModel,
                 investmentVM: investmentVM,
-                workspaceId: workspaceId,
                 editingIncome: income
             )
-        }
-        .task {
-            await viewModel.loadPassiveIncomes(workspaceId: workspaceId)
         }
     }
 }
@@ -116,7 +110,7 @@ struct PassiveIncomeRowView: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(income.description ?? income.type.displayName)
+                Text(income.descriptionText ?? income.type.displayName)
                     .font(.subheadline.weight(.medium))
                 HStack {
                     Text(income.type.displayName)
@@ -141,6 +135,6 @@ struct PassiveIncomeRowView: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(income.description ?? income.type.displayName), \(income.amount.formatted()), \(income.frequency.displayName)")
+        .accessibilityLabel("\(income.descriptionText ?? income.type.displayName), \(income.amount.formatted()), \(income.frequency.displayName)")
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum LiabilityType: String, Codable, Sendable, CaseIterable {
     case creditCard = "credit_card"
@@ -31,10 +32,9 @@ enum LiabilityType: String, Codable, Sendable, CaseIterable {
     }
 }
 
-struct Liability: Codable, Identifiable, Sendable {
-    let id: UUID
-    let workspaceId: UUID
-    let userId: UUID
+@Model
+final class Liability {
+    var id: UUID
     var name: String
     var type: LiabilityType
     var totalAmount: Double
@@ -44,7 +44,7 @@ struct Liability: Codable, Identifiable, Sendable {
     var currency: String
     var dueDate: Date?
     var notes: String?
-    let createdAt: Date?
+    var createdAt: Date
     var updatedAt: Date?
 
     var paidPercentage: Double {
@@ -52,16 +52,29 @@ struct Liability: Codable, Identifiable, Sendable {
         return ((totalAmount - remainingAmount) / totalAmount) * 100
     }
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, type, currency, notes
-        case workspaceId = "workspace_id"
-        case userId = "user_id"
-        case totalAmount = "total_amount"
-        case remainingAmount = "remaining_amount"
-        case interestRate = "interest_rate"
-        case monthlyPayment = "monthly_payment"
-        case dueDate = "due_date"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+    init(
+        id: UUID = UUID(),
+        name: String,
+        type: LiabilityType,
+        totalAmount: Double,
+        remainingAmount: Double,
+        interestRate: Double? = nil,
+        monthlyPayment: Double? = nil,
+        currency: String = AppConstants.defaultCurrency,
+        dueDate: Date? = nil,
+        notes: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.totalAmount = totalAmount
+        self.remainingAmount = remainingAmount
+        self.interestRate = interestRate
+        self.monthlyPayment = monthlyPayment
+        self.currency = currency
+        self.dueDate = dueDate
+        self.notes = notes
+        self.createdAt = createdAt
     }
 }
